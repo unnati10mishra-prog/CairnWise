@@ -46,6 +46,8 @@ class Database:
 
     def __init__(self, path: str | os.PathLike[str] | None = None):
         configured = path or os.getenv("CAIRNWISE_DB_PATH")
+        if not configured and os.getenv("VERCEL"):
+            configured = "/tmp/cairnwise.db"
         self.path = Path(configured) if configured else ROOT / "data" / "cairnwise.db"
         if self.path != Path(":memory:"):
             self.path.parent.mkdir(parents=True, exist_ok=True)
