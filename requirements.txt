@@ -1,0 +1,7 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pytest>=8,<9
+httpx>=0.27,<1
+# Required for production Supabase JWKS (RS256/ES256) signature verification.
+# HS256 deployments can use the stdlib verifier with the server-only JWT secret.
+cryptography>=43,<51

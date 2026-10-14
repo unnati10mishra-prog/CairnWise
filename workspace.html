@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0d0c">
+  <title>Cairnwise workspace</title>
+  <style>
+    :root {
+      --bg: #080b0a;
+      --surface: #0e1411;
+      --surface-2: #131b16;
+      --surface-3: #18221b;
+      --ink: #f2efe7;
+      --paper: #e9e7dd;
+      --muted: #9aa69d;
+      --quiet: #6e7b72;
+      --line: rgba(233, 239, 226, .14);
+      --line-strong: rgba(233, 239, 226, .27);
+      --accent: #d8f57b;
+      --accent-ink: #162111;
+      --warm: #e9ad71;
+      --danger: #ef8c8c;
+      --blue: #9cc4d9;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --serif: Georgia, "Times New Roman", serif;
+      --radius: 4px;
+      --shadow: 0 24px 70px rgba(0,0,0,.32);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { background: var(--bg); color-scheme: dark; }
+    body { margin: 0; min-width: 320px; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; }
+    .skip-link { position: fixed; z-index: 100; top: 12px; left: 14px; padding: 8px 12px; background: var(--accent); color: var(--accent-ink); transform: translateY(-180%); }
+    .skip-link:focus { transform: translateY(0); }
+    .app-shell { min-height: 100svh; display: grid; grid-template-columns: 244px minmax(0, 1fr); }
+    .sidebar { display: flex; flex-direction: column; min-height: 100svh; padding: 24px 15px 18px; border-right: 1px solid var(--line); background: rgba(14,20,17,.76); }
+    .brand { display: inline-flex; align-items: center; gap: 10px; padding: 0 11px; font-family: var(--serif); font-size: 21px; letter-spacing: -.04em; text-decoration: none; }
+    .brand-mark { width: 20px; height: 20px; position: relative; display: inline-block; }
+    .brand-mark::before, .brand-mark::after { content: ""; position: absolute; left: 50%; transform: translateX(-50%) rotate(45deg); border: 1px solid var(--accent); }
+    .brand-mark::before { top: 0; width: 11px; height: 11px; }
+    .brand-mark::after { bottom: 0; width: 18px; height: 8px; background: var(--accent); }
+    .brand em { font-style: normal; color: var(--accent); }
+    .workspace-label { margin: 50px 11px 12px; color: var(--quiet); font-size: 10px; letter-spacing: .17em; text-transform: uppercase; }
+    .nav { display: grid; gap: 5px; }
+    .nav-button { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 42px; padding: 0 11px; border: 1px solid transparent; border-radius: var(--radius); background: transparent; color: var(--muted); text-align: left; }
+    .nav-button:hover, .nav-button:focus-visible, .nav-button.active { border-color: rgba(216,245,123,.22); background: rgba(216,245,123,.07); color: var(--accent); }
+    .nav-icon { width: 20px; color: currentColor; text-align: center; font-size: 18px; }
+    .sidebar-bottom { margin-top: auto; padding: 16px 11px 0; border-top: 1px solid var(--line); }
+    .source-badge, .mini-status { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+    .source-badge::before, .mini-status::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; }
+    .sidebar-note { margin: 12px 0 0; color: var(--quiet); font-size: 11px; line-height: 1.55; }
+    .main { min-width: 0; padding: 0 clamp(18px, 4vw, 64px) 70px; }
+    .topbar { min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); }
+    .topbar h1 { margin: 0; font-family: var(--serif); font-size: clamp(26px, 3vw, 42px); font-weight: 400; letter-spacing: -.05em; }
+    .topbar-meta { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+    .user-chip { color: var(--muted); font-size: 12px; }
+    .button { min-height: 38px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--paper); font-size: 10px; letter-spacing: .11em; text-transform: uppercase; }
+    .button:hover, .button:focus-visible { border-color: var(--accent); background: rgba(216,245,123,.07); }
+    .button.primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+    .button.primary:hover, .button.primary:focus-visible { background: #efffb9; }
+    .button.small { min-height: 31px; padding: 0 10px; font-size: 9px; }
+    .button.danger { color: var(--danger); border-color: rgba(239,140,140,.35); }
+    .button:disabled { cursor: not-allowed; opacity: .45; }
+    .page { display: none; padding-top: 28px; }
+    .page.active { display: block; }
+    .notice { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 22px; padding: 13px 15px; border: 1px solid rgba(216,245,123,.22); background: rgba(216,245,123,.055); color: var(--muted); font-size: 12px; }
+    .notice strong { color: var(--accent); font-weight: 500; }
+    .notice-icon { flex: 0 0 auto; color: var(--accent); }
+    .grid { display: grid; gap: 14px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card { min-width: 0; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 14px 50px rgba(0,0,0,.1); }
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 17px 18px; border-bottom: 1px solid var(--line); }
+    .card-head h2, .card-head h3 { margin: 0; font-family: var(--serif); font-weight: 400; letter-spacing: -.035em; }
+    .card-head h2 { font-size: 25px; }
+    .card-head h3 { font-size: 20px; }
+    .card-head p { margin: 4px 0 0; color: var(--quiet); font-size: 11px; }
+    .card-body { padding: 18px; }
+    .metric { min-height: 112px; padding: 17px; border: 1px solid var(--line); background: rgba(255,255,255,.018); }
+    .metric-label { color: var(--quiet); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; }
+    .metric-value { margin: 11px 0 3px; color: var(--paper); font-family: var(--serif); font-size: 33px; line-height: 1; }
+    .metric-help { color: var(--muted); font-size: 11px; }
+    .metric.accent .metric-value { color: var(--accent); }
+    .section-intro { margin: 0 0 19px; }
+    .section-intro h2 { margin: 0; font-family: var(--serif); font-size: 32px; font-weight: 400; letter-spacing: -.05em; }
+    .section-intro p { max-width: 620px; margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+    .empty { padding: 30px 18px; border: 1px dashed var(--line-strong); color: var(--muted); text-align: center; }
+    .empty strong { display: block; margin-bottom: 6px; color: var(--paper); font-family: var(--serif); font-size: 22px; font-weight: 400; }
+    .form-grid { display: grid; gap: 13px; }
+    .form-grid.two { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    label { display: grid; gap: 6px; color: var(--muted); font-size: 11px; }
+    input, select { width: 100%; min-height: 42px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: var(--radius); outline: 0; background: var(--bg); color: var(--paper); }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(216,245,123,.1); }
+    .form-actions { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 15px; }
+    .helper { color: var(--quiet); font-size: 11px; }
+    .error { min-height: 18px; margin-top: 11px; color: var(--danger); font-size: 12px; }
+    .success { color: var(--accent); font-size: 12px; }
+    .asset-list, .coverage-list, .evidence-list, .event-list { display: grid; gap: 8px; }
+    .asset-row, .coverage-row, .evidence-row, .event-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; padding: 12px 0; border-bottom: 1px solid rgba(233,239,226,.08); }
+    .asset-row:last-child, .coverage-row:last-child, .evidence-row:last-child, .event-row:last-child { border-bottom: 0; }
+    .row-main { min-width: 0; }
+    .row-title { overflow: hidden; color: var(--paper); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+    .row-sub { margin-top: 3px; color: var(--quiet); font-size: 11px; line-height: 1.45; }
+    .state { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; color: var(--accent); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    .state::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; content: ""; }
+    .state.review, .state.degraded { color: var(--warm); }
+    .state.unknown, .state.unavailable, .state.insufficient_evidence { color: var(--quiet); }
+    .state.danger { color: var(--danger); }
+    .queue-layout { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr); gap: 14px; align-items: start; }
+    .queue-list { padding: 7px; }
+    .queue-item { width: 100%; display: grid; grid-template-columns: 7px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 13px 10px; border: 1px solid transparent; border-radius: var(--radius); background: transparent; color: var(--paper); text-align: left; }
+    .queue-item:hover, .queue-item:focus-visible, .queue-item.selected { border-color: rgba(216,245,123,.18); background: rgba(216,245,123,.06); }
+    .queue-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warm); box-shadow: 0 0 0 4px rgba(233,173,113,.09); }
+    .queue-dot.good { background: var(--accent); box-shadow: 0 0 0 4px rgba(216,245,123,.09); }
+    .queue-dot.quiet { background: var(--quiet); box-shadow: 0 0 0 4px rgba(110,123,114,.09); }
+    .queue-score { color: var(--accent); font-family: var(--serif); font-size: 18px; }
+    .queue-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 15px; }
+    .queue-actions .button { border-radius: var(--radius); }
+    .inspector { min-height: 500px; }
+    .inspector-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; padding: 18px; border-bottom: 1px solid var(--line); }
+    .inspector-hero h2 { margin: 0; font-family: var(--serif); font-size: 30px; font-weight: 400; letter-spacing: -.05em; }
+    .inspector-hero p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+    .dimension-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; padding: 18px; }
+    .dimension { padding: 13px; border: 1px solid var(--line); background: rgba(255,255,255,.018); }
+    .dimension-label { color: var(--quiet); font-size: 10px; letter-spacing: .11em; text-transform: uppercase; }
+    .dimension-value { margin-top: 8px; color: var(--paper); font-family: var(--serif); font-size: 22px; }
+    .meter { height: 4px; margin-top: 9px; overflow: hidden; background: var(--line); }
+    .meter i { display: block; height: 100%; background: var(--accent); }
+    .inspector-section { padding: 0 18px 18px; }
+    .inspector-section h3 { margin: 0 0 9px; color: var(--quiet); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 10px; }
+    .tag.signal { color: var(--accent); border-color: rgba(216,245,123,.25); }
+    .tag.warn { color: var(--warm); border-color: rgba(233,173,113,.28); }
+    .case-panel { margin: 0 18px 18px; padding: 14px; border: 1px solid rgba(216,245,123,.2); background: rgba(216,245,123,.045); }
+    .case-panel h3 { margin: 0 0 6px; font-family: var(--serif); font-size: 21px; font-weight: 400; }
+    .case-panel p { margin: 0; color: var(--muted); font-size: 12px; }
+    .case-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+    .report-block { margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--line); }
+    pre { max-width: 100%; margin: 0; overflow: auto; white-space: pre-wrap; word-break: break-word; color: var(--muted); font: 11px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .auth-screen { width: 100%; min-width: 0; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: 24px; overflow: hidden; background: radial-gradient(circle at 70% 15%, rgba(216,245,123,.08), transparent 36%), var(--bg); }
+    .auth-card { width: 100%; max-width: 480px; min-width: 0; overflow: hidden; padding: 30px; border: 1px solid var(--line-strong); background: rgba(14,20,17,.9); box-shadow: var(--shadow); }
+    .auth-card .brand { padding: 0; }
+    .auth-card h1 { margin: 36px 0 8px; font-family: var(--serif); font-size: 40px; font-weight: 400; letter-spacing: -.06em; line-height: 1; }
+    .auth-card > p { margin: 0 0 24px; color: var(--muted); font-size: 13px; }
+    .auth-switch { display: flex; gap: 7px; margin-bottom: 18px; }
+    .auth-switch button { flex: 1 1 0; min-width: 0; min-height: 35px; padding: 0 5px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; overflow-wrap: anywhere; }
+    .auth-switch button.active { border-color: var(--accent); color: var(--accent); }
+    .oauth-button { width: 100%; min-height: 44px; margin-top: 6px; }
+    .auth-provider-note { margin-top: 12px; }
+    .mobile-nav { display: none; }
+    .toast { position: fixed; z-index: 90; right: 20px; bottom: 20px; max-width: min(380px, calc(100vw - 40px)); padding: 12px 15px; border: 1px solid var(--line-strong); background: var(--surface-3); color: var(--paper); box-shadow: var(--shadow); opacity: 0; pointer-events: none; transform: translateY(12px); transition: opacity .25s ease, transform .25s ease; }
+    .toast.show { opacity: 1; transform: none; }
+    .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    @media (max-width: 920px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .main { padding: 0 17px 82px; }
+      .topbar { min-height: 72px; }
+      .mobile-nav { position: fixed; z-index: 50; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(4, 1fr); padding: 7px max(7px, env(safe-area-inset-left)) max(7px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(8,11,10,.94); backdrop-filter: blur(16px); }
+      .mobile-nav button { min-height: 45px; border: 0; background: transparent; color: var(--quiet); font-size: 9px; }
+      .mobile-nav button.active { color: var(--accent); }
+      .mobile-nav b { display: block; margin-bottom: 2px; font-size: 17px; font-weight: 400; }
+      .queue-layout { grid-template-columns: 1fr; }
+      .inspector { min-height: 0; }
+    }
+    @media (max-width: 620px) {
+      .topbar { align-items: flex-start; padding: 17px 0; }
+      .topbar-meta { display: grid; justify-items: end; gap: 6px; }
+      .topbar h1 { font-size: 28px; }
+      .topbar .source-badge { font-size: 8px; }
+      .grid.two, .grid.three, .form-grid.two { grid-template-columns: 1fr; }
+      .card-head { padding: 14px; }
+      .card-body { padding: 14px; }
+      .dimension-grid { grid-template-columns: 1fr; padding: 14px; }
+      .inspector-hero { padding: 14px; }
+      .inspector-section { padding: 0 14px 14px; }
+      .case-panel { margin: 0 14px 14px; }
+      .auth-card { padding: 22px; }
+      .auth-card h1 { font-size: 35px; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#workspace-main">Skip to workspace</a>
+  <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
+    <div class="auth-card">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span>cairn<em>wise</em></span></a>
+      <h1 id="auth-title">A real place to review.</h1>
+      <p>Authenticated workspace for evidence-led identity risk operations. Fixture mode is explicit and never represents live coverage.</p>
+      <div class="auth-switch" id="local-auth-switch" role="tablist" aria-label="Authentication mode" hidden>
+        <button type="button" class="active" id="login-tab" role="tab" aria-selected="true">Sign in</button>
+        <button type="button" id="register-tab" role="tab" aria-selected="false">Create local account</button>
+      </div>
+      <form id="auth-form" hidden>
+        <div class="form-grid">
+          <label>Username<input id="auth-username" name="username" autocomplete="username" required minlength="3" maxlength="128"></label>
+          <label>Password<input id="auth-password" name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="256"></label>
+        </div>
+        <div class="form-actions"><button class="button primary" id="auth-submit" type="submit">Sign in</button><span class="helper">Local development account only</span></div>
+        <div class="error" id="auth-error" role="alert"></div>
+      </form>
+      <div id="supabase-auth" hidden>
+        <button class="button primary oauth-button" id="google-sign-in" type="button">Continue with Google</button>
+        <div class="helper auth-provider-note" id="supabase-auth-help">You will continue through the configured Supabase Google provider.</div>
+        <div class="error" id="supabase-auth-error" role="alert"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="app-shell" id="app-shell" hidden>
+    <aside class="sidebar" aria-label="Workspace navigation">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span>cairn<em>wise</em></span></a>
+      <div class="workspace-label">Workspace</div>
+      <nav class="nav">
+        <button class="nav-button active" data-page="overview" type="button"><span class="nav-icon">⌁</span>Overview</button>
+        <button class="nav-button" data-page="registry" type="button"><span class="nav-icon">◇</span>Identity registry</button>
+        <button class="nav-button" data-page="queue" type="button"><span class="nav-icon">◎</span>Review queue</button>
+        <button class="nav-button" data-page="coverage" type="button"><span class="nav-icon">◌</span>Coverage contract</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="source-badge">Local fixture mode</span><p class="sidebar-note">The foundation is real persistence and assessment over synthetic inputs. Live connectors are not enabled in this phase.</p></div>
+    </aside>
+    <main class="main" id="workspace-main">
+      <header class="topbar">
+        <h1 id="page-title">Overview</h1>
+        <div class="topbar-meta"><span class="source-badge">synthetic_fixture · not live coverage</span><span class="user-chip" id="user-chip"></span><button class="button small" id="logout-button" type="button">Sign out</button></div>
+      </header>
+      <div class="notice" role="status"><span class="notice-icon">●</span><div><strong>Truth boundary.</strong> This workspace runs an authenticated, persisted local foundation. Fixture observations are labelled at the API, database, and screen; source outages remain unavailable instead of becoming “all clear.”</div></div>
+
+      <section class="page active" data-page-view="overview" aria-labelledby="overview-heading">
+        <div class="section-intro"><h2 id="overview-heading">The operating loop, now executable.</h2><p>Start with a verified baseline, submit a deterministic candidate observation, inspect independent evidence, then make a human decision. Every step below is backed by the same API used by future clients.</p></div>
+        <div class="grid three" id="overview-metrics"></div>
+        <div class="grid two" style="margin-top:14px">
+          <article class="card"><div class="card-head"><div><h3>Start with a local baseline</h3><p>Load a deterministic baseline or create a brand record yourself.</p></div><button class="button small primary" id="seed-button" type="button">Load fixture baseline</button></div><div class="card-body" id="baseline-summary"><div id="baseline-status"></div><button class="button small" id="manual-baseline-toggle" type="button" style="margin-top:13px">Create manually</button><form id="manual-baseline-form" hidden style="margin-top:15px"><div class="form-grid"><label>Workspace name<input id="manual-workspace-name" required maxlength="200" value="My verification workspace"></label><label>Brand name<input id="manual-brand-name" required maxlength="200" placeholder="Your brand"></label><label>Website<input id="manual-brand-website" maxlength="2048" placeholder="https://example.com"></label><label>Locale<input id="manual-brand-locale" maxlength="32" value="en-IN"></label></div><div class="form-actions"><button class="button small primary" type="submit">Create baseline</button></div><div class="error" id="manual-baseline-error" role="alert"></div></form></div></article>
+          <article class="card"><div class="card-head"><div><h3>Run the first observation</h3><p>Choose a fixture to exercise the real intake, detector, and evidence ledger.</p></div><span class="mini-status">ready</span></div><div class="card-body"><div class="queue-actions" id="overview-fixture-actions"></div><div class="helper" id="overview-action-result">No observation submitted in this session.</div></div></article>
+        </div>
+      </section>
+
+      <section class="page" data-page-view="registry" aria-labelledby="registry-heading">
+        <div class="section-intro"><h2 id="registry-heading">Identity registry</h2><p>Official assets are stored separately from observations. Only an active verified identifier or canonical locator can authorize an exclusion.</p></div>
+        <div class="grid two"><article class="card"><div class="card-head"><div><h3>Brand baseline</h3><p>Version one · provenance remains visible</p></div></div><div class="card-body" id="registry-brand"></div></article><article class="card"><div class="card-head"><div><h3>Registered assets</h3><p>Accounts, app identifiers, publishers, and exceptions</p></div></div><div class="card-body"><div class="asset-list" id="asset-list"></div><form id="asset-form" hidden style="margin-top:17px;padding-top:17px;border-top:1px solid var(--line)"><div class="form-grid two"><label>Type<select id="asset-type"><option value="social_profile">Social profile</option><option value="mobile_app">Mobile app</option><option value="logo">Logo</option></select></label><label>Display name<input id="asset-display-name" maxlength="256" required></label><label>Canonical URL<input id="asset-url" maxlength="2048" placeholder="https://..."></label><label>Stable ID / package<input id="asset-stable-id" maxlength="512" placeholder="Platform stable identifier"></label><label>Platform / store<input id="asset-scope" maxlength="128" placeholder="fixture_social or fixture_app_store"></label><label>Publisher (apps)<input id="asset-publisher" maxlength="512"></label></div><div class="form-actions"><button class="button small primary" type="submit">Register asset</button></div><div class="error" id="asset-error" role="alert"></div></form><button class="button small" id="add-asset-toggle" type="button" hidden style="margin-top:13px">Add official asset</button></div></article></div>
+      </section>
+
+      <section class="page" data-page-view="queue" aria-labelledby="queue-heading">
+        <div class="section-intro"><h2 id="queue-heading">Review queue</h2><p>Similarity is a signal, not proof. Open a candidate to inspect source mode, detector dimensions, counterevidence, and the next human-approved action.</p></div>
+        <div class="queue-actions" id="queue-fixture-actions"></div>
+        <div class="queue-layout"><article class="card"><div class="card-head"><div><h3>Needs review</h3><p id="queue-summary">No observations yet.</p></div><button class="button small" id="refresh-button" type="button">Refresh</button></div><div class="queue-list" id="candidate-list"></div></article><article class="card inspector"><div id="candidate-inspector"><div class="empty"><strong>Select an observation</strong>The evidence inspector will show the stored raw observation, independent dimensions, reasons, and source limitations.</div></div></article></div>
+      </section>
+
+      <section class="page" data-page-view="coverage" aria-labelledby="coverage-heading">
+        <div class="section-intro"><h2 id="coverage-heading">Coverage contract</h2><p>Connector health is not a decorative percentage. This view shows what the local source can return and whether the latest run completed, failed, or has not been evaluated.</p></div>
+        <article class="card"><div class="card-head"><div><h3 id="coverage-brand-name">Coverage</h3><p>Declared operations and fields stay visible beside source state.</p></div><button class="button small" id="coverage-refresh" type="button">Refresh</button></div><div class="card-body"><div class="coverage-list" id="coverage-list"></div></div></article>
+      </section>
+    </main>
+    <nav class="mobile-nav" aria-label="Mobile workspace navigation">
+      <button class="active" data-page="overview" type="button"><b>⌁</b>Overview</button>
+      <button data-page="registry" type="button"><b>◇</b>Registry</button>
+      <button data-page="queue" type="button"><b>◎</b>Queue</button>
+      <button data-page="coverage" type="button"><b>◌</b>Coverage</button>
+    </nav>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    (() => {
+      const $ = (selector, scope = document) => scope.querySelector(selector);
+      const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
+      const state = { token: sessionStorage.getItem('cairnwise_token') || '', user: null, workspace: null, brand: null, assets: [], candidates: [], selected: null };
+      const authScreen = $('#auth-screen');
+      const appShell = $('#app-shell');
+      const toast = $('#toast');
+      let authConfig = null;
+      let supabaseClient = null;
+      let authMode = 'login';
+      let toastTimer;
+
+      const showToast = (message) => {
+        toast.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 3600);
+      };
+      const problem = async response => {
+        let body = {};
+        try { body = await response.json(); } catch (_) {}
+        const error = new Error(body.detail || `Request failed with ${response.status}`);
+        error.status = response.status;
+        error.body = body;
+        throw error;
+      };
+      const api = async (path, options = {}) => {
+        const headers = new Headers(options.headers || {});
+        headers.set('Content-Type', 'application/json');
+        if (state.token) headers.set('Authorization', `Bearer ${state.token}`);
+        const response = await fetch(path, { ...options, headers });
+        if (!response.ok) await problem(response);
+        return response.status === 204 ? null : response.json();
+      };
+      const publicSupabaseKey = () => authConfig?.anon_key || authConfig?.publishable_key || '';
+      const configureAuthUI = () => {
+        const local = !authConfig?.enabled;
+        $('#local-auth-switch').hidden = !local;
+        $('#auth-form').hidden = !local;
+        $('#supabase-auth').hidden = local;
+        if (local) {
+          $('#auth-error').textContent = '';
+          return;
+        }
+        const key = publicSupabaseKey();
+        const button = $('#google-sign-in');
+        button.disabled = !key;
+        $('#supabase-auth-help').textContent = key
+          ? 'Google sign-in is handled by Supabase; only the public browser key is used here.'
+          : 'Supabase is enabled on the API, but its public anon/publishable key is not configured.';
+      };
+      // Pinned CDN fallback: @supabase/supabase-js 2.49.1. It is loaded only
+      // for the Supabase mode; this browser path never receives a service key.
+      const loadSupabaseLibrary = () => new Promise((resolve, reject) => {
+        if (window.supabase?.createClient) { resolve(window.supabase); return; }
+        const source = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js';
+        const existing = document.querySelector(`script[src="${source}"]`);
+        if (existing) { existing.addEventListener('load', () => resolve(window.supabase), { once: true }); existing.addEventListener('error', () => reject(new Error('The pinned Supabase browser client could not be loaded.')), { once: true }); return; }
+        const script = document.createElement('script'); script.src = source; script.async = true;
+        script.onload = () => window.supabase?.createClient ? resolve(window.supabase) : reject(new Error('The Supabase browser client is unavailable.'));
+        script.onerror = () => reject(new Error('The pinned Supabase browser client could not be loaded.'));
+        document.head.appendChild(script);
+      });
+      const adoptSupabaseSession = session => {
+        state.token = session?.access_token || '';
+        if (state.token) sessionStorage.setItem('cairnwise_token', state.token);
+        else sessionStorage.removeItem('cairnwise_token');
+      };
+      const initializeSupabase = async () => {
+        if (!authConfig?.enabled) return;
+        // A token created by the development adapter must never be reused
+        // after the API switches to Supabase mode.
+        state.token = '';
+        sessionStorage.removeItem('cairnwise_token');
+        const key = publicSupabaseKey();
+        if (!key) return;
+        const library = await loadSupabaseLibrary();
+        supabaseClient = library.createClient(authConfig.supabase_url, key, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        });
+        supabaseClient.auth.onAuthStateChange((_event, session) => adoptSupabaseSession(session));
+        const result = await supabaseClient.auth.getSession();
+        if (result.error) throw result.error;
+        adoptSupabaseSession(result.data.session);
+      };
+      const clear = node => { while (node.firstChild) node.removeChild(node.firstChild); };
+      const text = (tag, value, className) => { const node = document.createElement(tag); node.textContent = value ?? ''; if (className) node.className = className; return node; };
+      const button = (label, action, className = 'button small') => { const node = document.createElement('button'); node.type = 'button'; node.className = className; node.textContent = label; node.addEventListener('click', action); return node; };
+      const formatState = value => String(value || 'unknown').replaceAll('_', ' ');
+      const stateClass = value => String(value || '').toLowerCase().replaceAll('_', '-');
+      const stateBadge = value => text('span', formatState(value), `state ${stateClass(value)}`);
+
+      const setAuthMode = mode => {
+        authMode = mode;
+        $('#login-tab').classList.toggle('active', mode === 'login');
+        $('#register-tab').classList.toggle('active', mode === 'register');
+        $('#login-tab').setAttribute('aria-selected', String(mode === 'login'));
+        $('#register-tab').setAttribute('aria-selected', String(mode === 'register'));
+        $('#auth-submit').textContent = mode === 'login' ? 'Sign in' : 'Create account';
+        $('#auth-password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+        $('#auth-error').textContent = '';
+      };
+      $('#login-tab').addEventListener('click', () => setAuthMode('login'));
+      $('#register-tab').addEventListener('click', () => setAuthMode('register'));
+
+      const showAuth = () => { authScreen.hidden = false; appShell.hidden = true; };
+      const showApp = () => { authScreen.hidden = true; appShell.hidden = false; $('#user-chip').textContent = state.user ? (state.user.display_name || state.user.email || state.user.username || '') : ''; };
+      const signOut = async () => {
+        try { if (state.token) await api('/v1/auth/logout', { method: 'POST' }); } catch (_) {}
+        try { if (supabaseClient) await supabaseClient.auth.signOut(); } catch (_) {}
+        state.token = ''; state.user = null; state.workspace = null; state.brand = null; state.candidates = []; sessionStorage.removeItem('cairnwise_token'); showAuth();
+      };
+      $('#logout-button').addEventListener('click', signOut);
+      $('#google-sign-in').addEventListener('click', async () => {
+        const errorNode = $('#supabase-auth-error'); errorNode.textContent = '';
+        if (!supabaseClient) { errorNode.textContent = 'Supabase Google sign-in is not ready. Check the public browser configuration.'; return; }
+        try {
+          const origin = (authConfig.redirect_origin || window.location.origin).replace(/\/$/, '');
+          const result = await supabaseClient.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: `${origin}/workspace` },
+          });
+          if (result.error) throw result.error;
+        } catch (error) { errorNode.textContent = error.message || 'Google sign-in could not start.'; }
+      });
+      $('#auth-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const errorNode = $('#auth-error'); errorNode.textContent = '';
+        const username = $('#auth-username').value.trim(); const password = $('#auth-password').value;
+        try {
+          const result = await api(authMode === 'login' ? '/v1/auth/login' : '/v1/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) });
+          state.token = result.access_token; state.user = result.user; sessionStorage.setItem('cairnwise_token', state.token); showApp(); await loadState();
+        } catch (error) { errorNode.textContent = error.message; }
+      });
+
+      const setPage = page => {
+        $$('[data-page-view]').forEach(section => section.classList.toggle('active', section.dataset.pageView === page));
+        $$('[data-page]').forEach(item => item.classList.toggle('active', item.dataset.page === page));
+        const titles = { overview: 'Overview', registry: 'Identity registry', queue: 'Review queue', coverage: 'Coverage contract' };
+        $('#page-title').textContent = titles[page] || 'Overview';
+      };
+      $$('[data-page]').forEach(item => item.addEventListener('click', () => setPage(item.dataset.page)));
+
+      const renderBaseline = () => {
+        const node = $('#baseline-status'); clear(node);
+        if (!state.brand) { node.append(text('div', 'No workspace baseline is loaded yet. The seed action creates a fictional Northstar Pay workspace with official assets.', 'helper')); return; }
+        const grid = document.createElement('div'); grid.className = 'asset-list';
+        grid.append(text('div', `${state.brand.name} · ${state.brand.locale}`, 'row-title'));
+        grid.append(text('div', `${state.assets.length} registered assets · versioned local baseline`, 'row-sub'));
+        grid.append(text('div', state.brand.website || 'No website registered', 'row-sub'));
+        node.append(grid);
+      };
+      const renderRegistry = () => {
+        const brandNode = $('#registry-brand'); clear(brandNode);
+        if (state.brand) {
+          brandNode.append(text('div', state.brand.name, 'row-title'), text('div', `Canonical key: ${state.brand.canonical_name}`, 'row-sub'), text('div', `Locale: ${state.brand.locale} · Regions: ${(state.brand.regions || []).join(', ') || 'not set'}`, 'row-sub'), text('div', state.brand.website || 'No website registered', 'row-sub'));
+        } else brandNode.append(text('div', 'Load a baseline to inspect the identity registry.', 'helper'));
+        const list = $('#asset-list'); clear(list);
+        $('#asset-form').hidden = !state.brand;
+        $('#add-asset-toggle').hidden = !state.brand;
+        if (!state.assets.length) { list.append(text('div', 'No official assets have been registered.', 'helper')); return; }
+        state.assets.forEach(asset => {
+          const row = document.createElement('div'); row.className = 'asset-row';
+          const main = document.createElement('div'); main.className = 'row-main';
+          main.append(text('div', asset.display_name || asset.asset_type, 'row-title'));
+          main.append(text('div', [asset.asset_type, asset.platform || asset.store || '', asset.stable_external_id || asset.canonical_url || ''].filter(Boolean).join(' · '), 'row-sub'));
+          row.append(main, stateBadge(asset.authorization_state)); list.append(row);
+        });
+      };
+
+      const renderMetrics = () => {
+        const node = $('#overview-metrics'); clear(node);
+        const reviewCount = state.candidates.filter(item => {
+          const decision = item.latest_assessment?.decision_state;
+          return decision && decision !== 'authorized';
+        }).length;
+        const evidenceCount = state.candidates.reduce((sum, item) => sum + (item.evidence || []).length, 0);
+        const metric = (label, value, help, accent = false) => {
+          const card = document.createElement('div'); card.className = `metric${accent ? ' accent' : ''}`;
+          card.append(text('div', label, 'metric-label'), text('div', value, 'metric-value'), text('div', help, 'metric-help')); node.append(card);
+        };
+        metric('Open review', String(reviewCount).padStart(2, '0'), `${state.candidates.length} persisted observation${state.candidates.length === 1 ? '' : 's'}`);
+        metric('Evidence linked', String(evidenceCount).padStart(2, '0'), 'raw + normalized + detector trail');
+        metric('Source mode', 'FIXTURE', 'offline / not live coverage', true);
+      };
+
+      const fixtureDefinitions = [
+        ['Social look-alike', 'social.lookalike'],
+        ['App look-alike', 'app.lookalike'],
+        ['Official control', 'social.official'],
+        ['Source outage', 'source.outage'],
+      ];
+      const renderFixtureActions = () => {
+        ['#overview-fixture-actions', '#queue-fixture-actions'].forEach(selector => {
+          const node = $(selector); clear(node);
+          fixtureDefinitions.forEach(([label, fixtureId]) => node.append(button(label, () => runFixture(fixtureId), fixtureId === 'source.outage' ? 'button small danger' : 'button small')));
+        });
+      };
+
+      const loadState = async () => {
+        const me = await api('/v1/auth/me'); state.user = me.user;
+        const stateResult = await api('/v1/dev/state');
+        state.workspace = stateResult.workspaces[0] || null;
+        state.brand = null; state.assets = []; state.candidates = []; state.selected = null;
+        if (state.workspace) {
+          const brands = await api(`/v1/workspaces/${encodeURIComponent(state.workspace.id)}/brands`);
+          if (brands.items.length) {
+            state.brand = await api(`/v1/brands/${encodeURIComponent(brands.items[0].id)}`);
+            const assets = await api(`/v1/brands/${encodeURIComponent(state.brand.id)}/assets`); state.assets = assets.items;
+            await refreshCandidates();
+          }
+        }
+        renderAll();
+      };
+      const refreshCandidates = async () => {
+        if (!state.brand) return;
+        const result = await api(`/v1/brands/${encodeURIComponent(state.brand.id)}/candidates`); state.candidates = result.items;
+        if (state.selected) {
+          const selected = state.candidates.find(item => item.id === state.selected.id);
+          state.selected = selected || null;
+        }
+      };
+      const renderAll = () => { renderMetrics(); renderBaseline(); renderRegistry(); renderQueue(); renderCoverage(); renderFixtureActions(); };
+
+      const runFixture = async fixtureId => {
+        if (!state.brand) { showToast('Load the fixture baseline first.'); setPage('overview'); return; }
+        try {
+          const result = await api(`/v1/brands/${encodeURIComponent(state.brand.id)}/candidates/intake`, {
+            method: 'POST', headers: { 'Idempotency-Key': `${fixtureId}-${Date.now()}` },
+            body: JSON.stringify({ fixture_id: fixtureId, source_mode: 'synthetic_fixture', locale: state.brand.locale }),
+          });
+          if (result.candidate_id) {
+            await refreshCandidates();
+            state.selected = state.candidates.find(item => item.id === result.candidate_id) || null;
+            showToast(`${fixtureId} stored and assessed. Source mode: synthetic_fixture.`);
+            $('#overview-action-result').textContent = `${fixtureId} → ${state.selected?.latest_assessment?.decision_state || 'stored'} · evidence ${state.selected?.evidence?.length || 0}`;
+          } else {
+            showToast(`Source state: ${result.availability}. No candidate was created.`);
+            $('#overview-action-result').textContent = `${fixtureId} → ${result.availability} · ${result.next_action}`;
+          }
+          renderAll(); setPage('queue');
+        } catch (error) { showToast(error.message); }
+      };
+      $('#seed-button').addEventListener('click', async () => {
+        try {
+          const result = await api('/v1/dev/seed', { method: 'POST', body: JSON.stringify({}) });
+          state.workspace = { ...result.workspace, role: 'owner' }; state.brand = result.brand; state.assets = result.assets;
+          await refreshCandidates(); renderAll(); showToast(result.reused ? 'Baseline already existed; loaded it from storage.' : 'Baseline persisted. Official assets are ready for comparison.');
+        } catch (error) { showToast(error.message); }
+      });
+      $('#manual-baseline-toggle').addEventListener('click', () => {
+        const form = $('#manual-baseline-form'); form.hidden = !form.hidden; if (!form.hidden) $('#manual-brand-name').focus();
+      });
+      $('#manual-baseline-form').addEventListener('submit', async event => {
+        event.preventDefault(); const errorNode = $('#manual-baseline-error'); errorNode.textContent = '';
+        try {
+          const workspace = await api('/v1/workspaces', { method: 'POST', body: JSON.stringify({ name: $('#manual-workspace-name').value.trim() }) });
+          const brand = await api(`/v1/workspaces/${encodeURIComponent(workspace.id)}/brands`, { method: 'POST', body: JSON.stringify({ name: $('#manual-brand-name').value.trim(), website: $('#manual-brand-website').value.trim() || undefined, locale: $('#manual-brand-locale').value.trim() || 'en-IN' }) });
+          state.workspace = workspace; state.brand = brand; state.assets = []; state.candidates = []; state.selected = null; $('#manual-baseline-form').hidden = true; await refreshCandidates(); renderAll(); setPage('registry'); showToast('Workspace and brand baseline persisted. Add official assets in the registry.');
+        } catch (error) { errorNode.textContent = error.message; }
+      });
+      $('#add-asset-toggle').addEventListener('click', () => { $('#asset-form').hidden = !$('#asset-form').hidden; if (!$('#asset-form').hidden) $('#asset-display-name').focus(); });
+      $('#asset-form').addEventListener('submit', async event => {
+        event.preventDefault(); const errorNode = $('#asset-error'); errorNode.textContent = '';
+        try {
+          const type = $('#asset-type').value; const scope = $('#asset-scope').value.trim();
+          const payload = {
+            asset_type: type, display_name: $('#asset-display-name').value.trim(), canonical_url: $('#asset-url').value.trim() || undefined,
+            stable_external_id: $('#asset-stable-id').value.trim() || undefined, publisher: $('#asset-publisher').value.trim() || undefined,
+            platform: type === 'social_profile' ? scope || undefined : undefined, store: type === 'mobile_app' ? scope || undefined : undefined,
+            authorization_state: 'authorized', verification_source: 'local owner baseline entry',
+          };
+          await api(`/v1/brands/${encodeURIComponent(state.brand.id)}/assets`, { method: 'POST', body: JSON.stringify(payload) });
+          const assets = await api(`/v1/brands/${encodeURIComponent(state.brand.id)}/assets`); state.assets = assets.items; $('#asset-form').reset(); renderAll(); showToast('Official asset registered and versioned.');
+        } catch (error) { errorNode.textContent = error.message; }
+      });
+      $('#refresh-button').addEventListener('click', async () => { try { await refreshCandidates(); renderAll(); showToast('Queue refreshed from the API.'); } catch (error) { showToast(error.message); } });
+      $('#coverage-refresh').addEventListener('click', async () => { try { await renderCoverage(true); showToast('Coverage refreshed from source-run state.'); } catch (error) { showToast(error.message); } });
+
+      const renderQueue = () => {
+        const list = $('#candidate-list'); clear(list);
+        $('#queue-summary').textContent = state.candidates.length ? `${state.candidates.length} stored candidate${state.candidates.length === 1 ? '' : 's'} · newest first` : 'No observations yet.';
+        if (!state.candidates.length) { list.append(text('div', 'No observations yet. Use a fixture above to run the real intake path.', 'helper')); } else {
+          state.candidates.forEach(candidate => {
+            const assessment = candidate.latest_assessment || {};
+            const item = document.createElement('button'); item.type = 'button'; item.className = `queue-item${state.selected?.id === candidate.id ? ' selected' : ''}`;
+            const dot = document.createElement('span'); dot.className = `queue-dot ${assessment.decision_state === 'authorized' ? 'good' : assessment.decision_state === 'insufficient_evidence' ? 'quiet' : ''}`;
+            const main = document.createElement('span'); main.className = 'row-main';
+            const raw = candidate.latest_observation?.raw || {}; main.append(text('span', raw.display_name || raw.title || candidate.source_identity, 'row-title'), text('span', `${candidate.asset_type} · ${candidate.latest_observation?.source_mode || 'unknown'}`, 'row-sub'));
+            item.append(dot, main, text('span', Number(assessment.queue_priority || 0).toFixed(2), 'queue-score'));
+            item.addEventListener('click', () => { state.selected = candidate; renderQueue(); }); list.append(item);
+          });
+        }
+        renderInspector();
+      };
+
+      const renderInspector = () => {
+        const root = $('#candidate-inspector'); clear(root);
+        if (!state.selected) { root.append(text('div', 'Select an observation', 'empty'), text('div', 'The evidence inspector will show the stored raw observation, independent dimensions, reasons, and source limitations.', 'helper')); return; }
+        const candidate = state.selected; const assessment = candidate.latest_assessment || {}; const observation = candidate.latest_observation || {}; const raw = observation.raw || {};
+        const hero = document.createElement('div'); hero.className = 'inspector-hero';
+        const heroText = document.createElement('div'); heroText.append(text('h2', raw.display_name || raw.title || candidate.source_identity), text('p', `${candidate.asset_type} · ${observation.source_mode} · ${observation.availability_state}`));
+        hero.append(heroText, stateBadge(assessment.decision_state || candidate.review_state)); root.append(hero);
+        const dimensions = document.createElement('div'); dimensions.className = 'dimension-grid';
+        const dimensionsData = [
+          ['Identity resemblance', assessment.identity_resemblance, Number(assessment.identity_resemblance || 0), 'signal'],
+          ['Authorization', assessment.authorization_state || 'unknown', assessment.authorization_state === 'authorized' ? 1 : Number(assessment.authorization_conflict || 0), ''],
+          ['Potential harm', assessment.potential_harm_level || 'unknown', Number(assessment.observed_harm || 0), assessment.potential_harm_level === 'high' ? 'warn' : ''],
+          ['Evidence quality', assessment.evidence_quality, Number(assessment.evidence_quality || 0), ''],
+        ];
+        dimensionsData.forEach(([label, value, percent, extra]) => {
+          const card = document.createElement('div'); card.className = 'dimension'; card.append(text('div', label, 'dimension-label'), text('div', typeof value === 'number' ? value.toFixed(2) : formatState(value), 'dimension-value'));
+          const meter = document.createElement('div'); meter.className = 'meter'; const bar = document.createElement('i'); bar.style.width = `${Math.max(0, Math.min(1, percent)) * 100}%`; if (extra === 'warn') bar.style.background = 'var(--warm)'; meter.append(bar); card.append(meter); dimensions.append(card);
+        });
+        root.append(dimensions);
+        const evidenceSection = document.createElement('div'); evidenceSection.className = 'inspector-section'; evidenceSection.append(text('h3', 'Detector reasons'));
+        const tags = document.createElement('div'); tags.className = 'tag-list'; (assessment.reasons || []).forEach(reason => tags.append(text('span', reason, 'tag signal'))); if (!tags.childNodes.length) tags.append(text('span', 'No positive comparison reason recorded', 'tag')); evidenceSection.append(tags); root.append(evidenceSection);
+        const limitationSection = document.createElement('div'); limitationSection.className = 'inspector-section'; limitationSection.append(text('h3', 'Counterevidence / missing proof'));
+        const limitations = [...(assessment.counterevidence || []), ...(assessment.missing || []).map(item => `missing:${item}`)]; const limitationTags = document.createElement('div'); limitationTags.className = 'tag-list'; limitations.forEach(item => limitationTags.append(text('span', item, 'tag warn'))); if (!limitations.length) limitationTags.append(text('span', 'No missing evidence recorded', 'tag')); limitationSection.append(limitationTags); root.append(limitationSection);
+        const evidenceSection2 = document.createElement('div'); evidenceSection2.className = 'inspector-section'; evidenceSection2.append(text('h3', `Evidence ledger · ${candidate.evidence?.length || 0} records`));
+        const evidenceList = document.createElement('div'); evidenceList.className = 'evidence-list'; (candidate.evidence || []).forEach(item => { const row = document.createElement('div'); row.className = 'evidence-row'; const main = document.createElement('div'); main.className = 'row-main'; main.append(text('div', item.evidence_type, 'row-title'), text('div', item.excerpt, 'row-sub')); row.append(main, text('span', item.integrity_hash.slice(0, 10), 'helper')); evidenceList.append(row); }); evidenceSection2.append(evidenceList); root.append(evidenceSection2);
+        const actionPanel = document.createElement('div'); actionPanel.className = 'case-panel';
+        if (candidate.case) {
+          actionPanel.append(text('h3', `Case ${candidate.case.id.slice(-10)}`), text('p', `${formatState(candidate.case.disposition)} · owner ${candidate.case.owner}`));
+          const actions = document.createElement('div'); actions.className = 'case-actions';
+          [['Monitor', 'monitor'], ['Investigate', 'investigate'], ['Insufficient evidence', 'insufficient_evidence'], ['Confirm under policy', 'confirmed_impersonation_under_policy']].forEach(([label, disposition]) => actions.append(button(label, () => decideCase(candidate.case.id, disposition), disposition === 'confirmed_impersonation_under_policy' ? 'button small danger' : 'button small')));
+          actions.append(button('Generate report draft', () => generateDraft(candidate.case.id), 'button small primary')); actionPanel.append(actions);
+          const draft = candidate.case.report_drafts?.[0]; if (draft) { const report = document.createElement('div'); report.className = 'report-block'; report.append(text('div', 'Draft persisted · not submitted', 'success'), text('div', `${draft.content.evidence_ids?.length || 0} cited evidence records · human approval still required`, 'helper')); actionPanel.append(report); }
+        } else {
+          actionPanel.append(text('h3', 'Open an accountable case'), text('p', 'Create a persisted case before recording a human disposition or generating a report draft.'));
+          actionPanel.append(button('Open case', () => openCase(candidate.id), 'button small primary'));
+        }
+        root.append(actionPanel);
+      };
+
+      const openCase = async candidateId => {
+        try {
+          await api(`/v1/candidates/${encodeURIComponent(candidateId)}/cases`, { method: 'POST', body: JSON.stringify({}) });
+          await refreshCandidates(); renderAll(); showToast('Case persisted. Human disposition is now available.');
+        } catch (error) { showToast(error.message); }
+      };
+      const decideCase = async (caseId, disposition) => {
+        const reason = disposition === 'confirmed_impersonation_under_policy'
+          ? 'Reviewer recorded an organizational policy disposition from the stored evidence.'
+          : `Reviewer selected ${disposition}; this is not a legal or criminal conclusion.`;
+        try {
+          await api(`/v1/cases/${encodeURIComponent(caseId)}/decisions`, { method: 'POST', body: JSON.stringify({ disposition, reason }) });
+          await refreshCandidates(); renderAll(); showToast(`Decision recorded: ${formatState(disposition)}.`);
+        } catch (error) { showToast(error.message); }
+      };
+      const generateDraft = async caseId => {
+        try {
+          await api(`/v1/cases/${encodeURIComponent(caseId)}/report-drafts`, { method: 'POST' });
+          await refreshCandidates(); renderAll(); showToast('Evidence-linked report draft persisted. Nothing was submitted externally.');
+        } catch (error) { showToast(error.message); }
+      };
+
+      const renderCoverage = async (force = false) => {
+        const node = $('#coverage-list');
+        if (!state.brand) { clear(node); node.append(text('div', 'Load a baseline to inspect connector coverage.', 'helper')); return; }
+        if (!force && node.dataset.loaded === state.brand.id) return;
+        const result = await api(`/v1/brands/${encodeURIComponent(state.brand.id)}/coverage`); clear(node); $('#coverage-brand-name').textContent = `${result.brand_name} · declared sources`;
+        result.connectors.forEach(connector => {
+          const row = document.createElement('div'); row.className = 'coverage-row'; const main = document.createElement('div'); main.className = 'row-main'; main.append(text('div', connector.source, 'row-title'), text('div', `${connector.connector_key} · ${connector.asset_type}`, 'row-sub'), text('div', `Fields: ${connector.fields.join(', ')}`, 'row-sub')); const right = document.createElement('div'); right.append(stateBadge(connector.state), text('div', `mode: ${connector.source_mode}`, 'row-sub')); row.append(main, right); node.append(row);
+        });
+        node.dataset.loaded = state.brand.id;
+      };
+
+      const boot = async () => {
+        renderFixtureActions();
+        try {
+          const configResponse = await fetch('/v1/auth/config', { headers: { Accept: 'application/json' } });
+          if (!configResponse.ok) throw new Error('Authentication configuration is unavailable.');
+          authConfig = await configResponse.json();
+          configureAuthUI();
+          await initializeSupabase();
+        } catch (error) {
+          authConfig = { enabled: true };
+          configureAuthUI();
+          showAuth();
+          $('#supabase-auth-error').textContent = error.message || 'Authentication configuration is unavailable.';
+          return;
+        }
+        if (!state.token) { showAuth(); return; }
+        try { showApp(); await loadState(); } catch (error) { sessionStorage.removeItem('cairnwise_token'); state.token = ''; showAuth(); $('#auth-error').textContent = 'Your local session expired. Sign in again.'; }
+      };
+      boot();
+    })();
+  </script>
+</body>
+</html>

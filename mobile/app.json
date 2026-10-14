@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Cairnwise Mobile",
+    "slug": "cairnwise-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "cairnwise",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.cairnwise.mobile"
+    },
+    "android": {
+      "package": "com.cairnwise.mobile"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "social.bluesky.actor_search.v1": {
+    "enabled": false,
+    "rights": {
+      "permissions": "Public actor metadata query; final terms review required",
+      "terms_basis": "Record the reviewed Bluesky terms/purpose basis here",
+      "terms_reviewed_at": "YYYY-MM-DD",
+      "retention_class": "metadata_180d",
+      "image_rights": "Avatar URL reference only; image bytes not retained",
+      "owner": "source-governance",
+      "review_status": "pending_explicit_enablement"
+    }
+  },
+  "app.apple.itunes_search_lookup.v1": {
+    "enabled": false,
+    "rights": {
+      "permissions": "Public iTunes Search/Lookup metadata query",
+      "terms_basis": "Record the reviewed Apple API terms/purpose basis here",
+      "terms_reviewed_at": "YYYY-MM-DD",
+      "retention_class": "metadata_180d",
+      "image_rights": "Artwork URL reference only; image bytes not retained",
+      "owner": "source-governance",
+      "review_status": "pending_explicit_enablement"
+    }
+  }
+}

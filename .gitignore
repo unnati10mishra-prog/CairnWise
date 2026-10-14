@@ -1,0 +1,38 @@
+data/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Dependencies & build outputs
+node_modules/
+mobile/node_modules/
+web/node_modules/
+web/.next/
+web/out/
+mobile/.expo/
+mobile/dist/
+
+# Environment and sensitive secrets
+.env
+.env.*
+!.env.example
+*.env
+*.env.*
+web/.env*
+!web/.env.example
+mobile/.env*
+
+# IDE and agent scratch artifacts
+.claude/
+.cursor/
+.gemini/
+.opencode/
+.impeccable/
+.codex/
+audit-screenshots/
+*.backup.html
+index.*backup.html
