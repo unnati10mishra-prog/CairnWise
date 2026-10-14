@@ -150,3 +150,37 @@ def risk_words(value: str | None) -> Iterator[str]:
     for word in ("support", "official", "help", "login", "care", "secure", "verify"):
         if word in present:
             yield word
+
+
+ZERO_WIDTH_AND_INVISIBLE_CHARS: dict[str, str] = {
+    "\u200b": "ZERO_WIDTH_SPACE",
+    "\u200c": "ZERO_WIDTH_NON_JOINER",
+    "\u200d": "ZERO_WIDTH_JOINER",
+    "\u00ad": "SOFT_HYPHEN",
+    "\u200e": "LEFT_TO_RIGHT_MARK",
+    "\u200f": "RIGHT_TO_LEFT_MARK",
+    "\u202a": "LEFT_TO_RIGHT_EMBEDDING",
+    "\u202b": "RIGHT_TO_LEFT_EMBEDDING",
+    "\u202c": "POP_DIRECTIONAL_FORMATTING",
+    "\u202d": "LEFT_TO_RIGHT_OVERRIDE",
+    "\u202e": "RIGHT_TO_LEFT_OVERRIDE",
+    "\ufeff": "ZERO_WIDTH_NO_BREAK_SPACE",
+}
+
+
+def detect_invisible_characters(value: str | None) -> list[dict[str, str]]:
+    """Detect and locate zero-width, bidirectional overrides, and invisible characters."""
+
+    if not isinstance(value, str):
+        return []
+    found: list[dict[str, str]] = []
+    for idx, ch in enumerate(value):
+        if ch in ZERO_WIDTH_AND_INVISIBLE_CHARS:
+            found.append({
+                "char": ch,
+                "index": str(idx),
+                "code_point": f"U+{ord(ch):04X}",
+                "name": ZERO_WIDTH_AND_INVISIBLE_CHARS[ch],
+            })
+    return found
+
