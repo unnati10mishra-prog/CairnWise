@@ -121,6 +121,9 @@
     .header-cta::after { content: "↗"; color: var(--accent); font-size: 14px; transition: transform .3s var(--ease); }
     .header-cta:hover, .header-cta:focus-visible { border-color: var(--accent); background: rgba(216,245,123,.08); color: #fff; }
     .header-cta:hover::after, .header-cta:focus-visible::after { transform: translate(2px, -2px); }
+    .header-cta.cta-primary { background: var(--accent); border-color: var(--accent); color: #172014; font-weight: 500; }
+    .header-cta.cta-primary::after { color: #172014; }
+    .header-cta.cta-primary:hover, .header-cta.cta-primary:focus-visible { background: #efffb9; border-color: #efffb9; color: #172014; }
     .menu-toggle { display: none; border: 0; background: transparent; padding: 8px 0 8px 8px; }
     .menu-toggle span { display: block; width: 28px; height: 2px; margin: 4px 0; background: var(--paper); transition: transform .35s var(--ease), opacity .35s ease; }
     .menu-toggle span:last-child { width: 20px; margin-left: auto; }
@@ -711,8 +714,12 @@
         <a href="#coverage">Coverage</a>
         <a href="#proof">Proof</a>
         <a href="/login">Sign In</a>
+        <a href="/signup" style="color: var(--accent);">Sign Up</a>
       </nav>
-      <a class="header-cta" href="/login">Operator Sign In</a>
+      <div style="display:inline-flex; align-items:center; gap:8px;">
+        <a class="header-cta" href="/login">Sign In</a>
+        <a class="header-cta cta-primary" href="/signup">Sign Up</a>
+      </div>
       <button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-panel" aria-label="Open menu">
         <span></span><span></span>
       </button>
@@ -727,7 +734,8 @@
       <a href="#evidence">Evidence</a>
       <a href="#coverage">Coverage</a>
       <a href="#proof">Proof</a>
-      <a href="/login">Sign In</a>
+      <a href="/login" style="color: var(--accent);">Sign In</a>
+      <a href="/signup" style="color: var(--accent);">Sign Up (Create Account)</a>
       <a href="/workspace">Operator Console</a>
     </nav>
     <p class="menu-note">Prototype concept · evidence before certainty</p>
@@ -741,8 +749,10 @@
           <h1 id="hero-title" class="reveal delay-1">Review suspicious identities with <em>evidence</em>, not guesswork.</h1>
           <p class="hero-copy reveal delay-2">Cairnwise is designed to help lean brand, fraud, and security teams review suspicious social profiles and mobile-app listings using permitted observations, evidence-linked comparisons, explicit uncertainty, and human-approved actions.</p>
           <div class="hero-actions reveal delay-3">
-            <a class="button primary" href="#evidence">Open the workspace preview</a>
-            <button class="button" type="button" data-open-modal>Inspect a finding</button>
+            <a class="button primary" href="/signup">Get Started / Sign Up</a>
+            <a class="button" href="/login">Operator Sign In</a>
+            <a class="button" href="/workspace" style="border-color: rgba(216,245,123,.3); color: var(--accent);">Direct Console</a>
+            <button class="button" type="button" data-open-modal>Inspect finding</button>
           </div>
           <div class="hero-footnote reveal delay-3"><span aria-hidden="true"></span> Social profiles + mobile-app listings <span aria-hidden="true"></span> Prototype concept · pre-implementation</div>
         </div>
@@ -930,14 +940,25 @@
         <div class="section-kicker">07 / A clearer place to start</div>
         <h2 class="editorial-heading" id="cta-title" data-ghost="NEXT REVIEW" data-ghost-depth="-18"><span class="editorial-line">Make the next review</span><span class="editorial-line"><em>defensible.</em></span></h2>
         <p data-enter="copy">Start with the official identity baseline. Then make every observation, uncertainty, and outcome legible to the people responsible for the brand.</p>
-        <a class="button primary" data-enter="action" href="#workflow">Walk through the workflow</a>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px;">
+          <a class="button primary" data-enter="action" href="/signup">Create Operator Account</a>
+          <a class="button" href="/login">Operator Sign In</a>
+          <a class="button" href="/workspace">Direct Console Access</a>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="footer-brand">cairn<em>wise</em></div>
-    <p class="footer-note">Cairnwise is a provisional working name and pre-implementation product concept. Source coverage, performance, and enforcement outcomes require implementation and validation.</p>
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; width: 100%;">
+      <div class="footer-brand">cairn<em>wise</em></div>
+      <div style="display: flex; gap: 24px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;">
+        <a href="/login" style="color: var(--muted); transition: color .2s;">Sign In</a>
+        <a href="/signup" style="color: var(--accent); transition: color .2s;">Sign Up</a>
+        <a href="/workspace" style="color: var(--paper); transition: color .2s;">Workspace</a>
+      </div>
+    </div>
+    <p class="footer-note">Cairnwise is an evidence-first digital identity risk operations system. Source coverage, performance, and enforcement outcomes are backed by cryptographic proof ledgers.</p>
   </footer>
 
   <div class="modal" id="evidence-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-lede" aria-hidden="true" inert>
