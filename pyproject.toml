@@ -11,5 +11,3 @@ dependencies = [
     "httpx>=0.27,<1",
 ]
 
-[tool.vercel]
-entrypoint = "cairnwise.api:app"
