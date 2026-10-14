@@ -4,6 +4,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrandLogo } from '@/components/BrandLogo';
+import { RadarSpiderChart } from '@/components/RadarSpiderChart';
+import { HomoglyphInspector } from '@/components/HomoglyphInspector';
+import { EvidenceCertificateModal } from '@/components/EvidenceCertificateModal';
+import { TakedownNoticeModal } from '@/components/TakedownNoticeModal';
+import { getSupabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { 
   Shield, 
@@ -43,7 +48,12 @@ import {
   FileCheck,
   Radio,
   FileCode,
-  AlertCircle
+  AlertCircle,
+  Volume2,
+  VolumeX,
+  Printer,
+  Send,
+  Zap,
 } from 'lucide-react';
 
 // ==========================================
@@ -506,6 +516,10 @@ export default function WorkspaceDashboard() {
   const [showAddAssetModal, setShowAddAssetModal] = useState(false);
   const [showNewIntakeModal, setShowNewIntakeModal] = useState(false);
   const [showDossierModal, setShowDossierModal] = useState(false);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [showTakedownModal, setShowTakedownModal] = useState(false);
+  const [isLiveConnected, setIsLiveConnected] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // New Asset Form State
@@ -525,6 +539,108 @@ export default function WorkspaceDashboard() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3800);
   };
+
+  // Tactical Audio Cue Synthesizer
+  const playTacticalSound = (type: 'action' | 'alert' | 'success') => {
+    if (!audioEnabled || typeof window === 'undefined') return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === 'action') {
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.05, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.08);
+      } else if (type === 'success') {
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.06, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+      } else if (type === 'alert') {
+        osc.frequency.setValueAtTime(320, ctx.currentTime);
+        osc.frequency.setValueAtTime(260, ctx.currentTime + 0.06);
+        gain.gain.setValueAtTime(0.07, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.14);
+      }
+    } catch {
+      // Audio policy handled
+    }
+  };
+
+  // Sync with Supabase (Live DB and Realtime Channel)
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    let isMounted = true;
+
+    async function loadSupabaseData() {
+      try {
+        const { data: brandRows } = await supabase!.from('brands').select('*').limit(1);
+        if (brandRows && brandRows.length > 0 && isMounted) {
+          setBrand({
+            id: brandRows[0].id,
+            name: brandRows[0].name,
+            canonical_name: brandRows[0].canonical_name,
+            website: brandRows[0].website || 'https://northstarpay.com',
+            locale: brandRows[0].locale || 'en-IN',
+            regions: typeof brandRows[0].regions_json === 'string' ? JSON.parse(brandRows[0].regions_json) : (brandRows[0].regions_json || ['IN', 'GLOBAL']),
+            registered_at: brandRows[0].created_at,
+          });
+        }
+
+        const { data: assetRows } = await supabase!.from('assets').select('*');
+        if (assetRows && assetRows.length > 0 && isMounted) {
+          setAssets(assetRows.map(a => ({
+            id: a.id,
+            asset_type: a.asset_type as any,
+            display_name: a.display_name,
+            canonical_url: a.canonical_url,
+            stable_external_id: a.stable_external_id,
+            platform: a.platform,
+            store: a.store,
+            publisher: a.publisher,
+            authorization_state: a.authorization_state as any,
+            verification_source: 'Supabase Official Identity Registry',
+          })));
+        }
+
+        setIsLiveConnected(true);
+      } catch (err) {
+        console.warn('Supabase sync notice:', err);
+      }
+    }
+
+    loadSupabaseData();
+
+    const channel = supabase.channel('cairnwise-ops-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidates' }, (payload) => {
+        triggerToast(`Live candidate event: ${payload.eventType.toUpperCase()}`);
+        playTacticalSound('alert');
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED' && isMounted) {
+          setIsLiveConnected(true);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Try to sync with FastAPI backend if available on mount
   useEffect(() => {
@@ -704,6 +820,66 @@ export default function WorkspaceDashboard() {
     triggerToast('Report draft generated citing 3 cryptographic evidence IDs. Unsupervised auto-reporting withheld.');
   };
 
+  // Bridge findings from Look-alike Simulator into live Review Queue
+  const handleQueueSimulatedFinding = (finding: {
+    displayName: string;
+    verdict: string;
+    homoglyphsFound: number;
+    resemblance: number;
+  }) => {
+    const newCandId = `cand_sim_${Date.now()}`;
+    const newCand: CandidateIncident = {
+      id: newCandId,
+      asset_type: 'social_profile',
+      source_identity: finding.displayName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      review_state: 'triaged',
+      latest_observation: {
+        source_mode: 'synthetic_fixture',
+        availability_state: 'available',
+        observed_at: 'Just now',
+        raw: {
+          display_name: finding.displayName,
+          handle: `@${finding.displayName.toLowerCase().replace(/\s+/g, '')}.bsky.social`,
+          bio: `Candidate synthesized in Look-alike Simulator. Unicode homoglyphs: ${finding.homoglyphsFound}. Verdict: ${finding.verdict}.`,
+          destination_url: 'https://security-verify.example/checkpoint',
+          icon_similarity: finding.resemblance,
+        },
+      },
+      latest_assessment: {
+        identity_resemblance: finding.resemblance,
+        authorization_state: 'unknown',
+        authorization_conflict: finding.resemblance > 0.6 ? 0.88 : 0.25,
+        potential_harm_level: finding.homoglyphsFound > 0 ? 'high' : 'medium',
+        observed_harm: finding.homoglyphsFound > 0 ? 0.89 : 0.45,
+        evidence_quality: 0.94,
+        queue_priority: Math.min(0.99, Number((finding.resemblance * 0.5 + (finding.homoglyphsFound > 0 ? 0.45 : 0.15)).toFixed(2))),
+        decision_state: 'review_required',
+        reasons: [
+          finding.homoglyphsFound > 0 ? `homoglyph_confusables_detected:${finding.homoglyphsFound}` : 'lexical_similarity_signal',
+          'simulator_interactive_intake',
+        ],
+        counterevidence: [],
+        missing: ['official_domain_match', 'brand_certificate_binding'],
+      },
+      evidence: [
+        {
+          id: `ev_sim_${Date.now()}`,
+          evidence_type: 'unicode_homoglyph_forensics',
+          excerpt: `Simulated candidate "${finding.displayName}" analyzed. Homoglyphs: ${finding.homoglyphsFound}. Lexical resemblance: ${(finding.resemblance * 100).toFixed(0)}%.`,
+          integrity_hash: 'c83b4a2f8910e54d89e210b3724a1b02c81e9204857b2930471b3e94821a7f34',
+          captured_at: new Date().toISOString(),
+          source_locator: 'cairnwise.simulator.homoglyph_engine#v2',
+        },
+      ],
+    };
+
+    setCandidates(prev => [newCand, ...prev]);
+    setSelectedCandidate(newCand);
+    setActiveTab('queue');
+    triggerToast(`Queued finding "${finding.displayName}" into triage queue.`);
+    playTacticalSound('alert');
+  };
+
   // Look-alike Simulator Analyzer (Bonus Requirement implementation)
   const simAnalysis = useMemo(() => {
     const input = simInput.trim();
@@ -766,21 +942,46 @@ export default function WorkspaceDashboard() {
           </div>
         </div>
 
-        {/* Center: Truth Boundary Indicator */}
-        <div className="hidden lg:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(216,245,123,0.06)] border border-[rgba(216,245,123,0.2)] text-[10.5px] font-mono text-[#d8f57b] tracking-wider uppercase">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#d8f57b] animate-pulse" />
-          <span>TRUTH BOUNDARY ACTIVE &bull; FIXTURE &amp; OBSERVATION AUDITED</span>
+        {/* Center: Live Sync & Truth Boundary Indicator */}
+        <div className="hidden lg:flex items-center gap-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(216,245,123,0.06)] border border-[rgba(216,245,123,0.2)] text-[10.5px] font-mono text-[#d8f57b] tracking-wider uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#d8f57b] animate-pulse" />
+            <span>TRUTH BOUNDARY ACTIVE &bull; 4D SIGNAL TRIANGULATION</span>
+          </div>
+          <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[10px] font-mono tracking-wider border ${
+            isLiveConnected
+              ? 'bg-[rgba(110,231,183,0.08)] text-[#6ee7b7] border-[rgba(110,231,183,0.3)]'
+              : 'bg-[rgba(233,173,113,0.08)] text-[#e9ad71] border-[rgba(233,173,113,0.25)]'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isLiveConnected ? 'bg-[#6ee7b7] animate-ping' : 'bg-[#e9ad71]'}`} />
+            <span>{isLiveConnected ? 'SUPABASE REALTIME SYNC' : 'STANDALONE FORENSIC ENGINE'}</span>
+          </div>
         </div>
 
         {/* Right Operator Controls */}
         <div className="flex items-center gap-3">
+          {/* Tactical Audio Feedback Toggle */}
+          <button
+            onClick={() => {
+              setAudioEnabled(!audioEnabled);
+              triggerToast(audioEnabled ? 'Tactical audio cues muted' : 'Tactical audio cues enabled');
+            }}
+            title={audioEnabled ? "Mute audio cues" : "Enable audio cues"}
+            className="p-1.5 rounded text-[#9ba69e] hover:text-[#d8f57b] hover:bg-[rgba(216,245,123,0.08)] transition-all"
+          >
+            {audioEnabled ? <Volume2 className="w-4 h-4 text-[#d8f57b]" /> : <VolumeX className="w-4 h-4 text-[#69756d]" />}
+          </button>
+
           <div className="hidden sm:flex items-center gap-2 text-xs font-mono px-2.5 py-1 rounded border border-[rgba(236,233,223,0.08)] bg-[rgba(14,20,17,0.6)]">
             <UserCheck className="w-3.5 h-3.5 text-[#d8f57b]" />
             <span className="text-[#9ba69e] truncate max-w-[150px]">{user?.email || 'elena.vance@northstar.security'}</span>
           </div>
 
           <button
-            onClick={() => handleSeedBaseline()}
+            onClick={() => {
+              handleSeedBaseline();
+              playTacticalSound('action');
+            }}
             title="Reset to deterministic baseline"
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono bg-[rgba(216,245,123,0.08)] hover:bg-[rgba(216,245,123,0.15)] text-[#d8f57b] border border-[rgba(216,245,123,0.25)] transition-all"
           >
@@ -1388,53 +1589,83 @@ export default function WorkspaceDashboard() {
 
                       {/* 4-Dimensional Signal Triangulation (Core of Solution.md) */}
                       <div>
-                        <div className="text-xs font-mono uppercase tracking-wider text-[#d8f57b] mb-3 flex items-center gap-2">
-                          <Activity className="w-3.5 h-3.5" />
-                          <span>4-DIMENSIONAL SIGNAL TRIANGULATION</span>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-xs font-mono uppercase tracking-wider text-[#d8f57b] flex items-center gap-2">
+                            <Activity className="w-3.5 h-3.5" />
+                            <span>4-DIMENSIONAL SIGNAL TRIANGULATION &amp; CONFIDENCE HALO</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-[#9cc4d9] px-2 py-0.5 rounded bg-[rgba(156,196,217,0.1)] border border-[rgba(156,196,217,0.2)]">
+                            NIST SP 800-86 ALIGNED
+                          </span>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                          {/* Dim 1: Resemblance */}
-                          <div className="p-3 rounded-lg bg-[rgba(14,20,17,0.7)] border border-[rgba(236,233,223,0.06)]">
-                            <span className="text-[10px] font-mono text-[#69756d] block mb-1">1. RESEMBLANCE</span>
-                            <div className="text-xl font-serif text-[#ece9df] mb-1">
-                              {(selectedCandidate.latest_assessment.identity_resemblance * 100).toFixed(0)}%
-                            </div>
-                            <div className="h-1 rounded-full bg-[rgba(236,233,223,0.08)] overflow-hidden">
-                              <div className="h-full bg-[#d8f57b]" style={{ width: `${selectedCandidate.latest_assessment.identity_resemblance * 100}%` }} />
-                            </div>
-                          </div>
-
-                          {/* Dim 2: Authorization */}
-                          <div className="p-3 rounded-lg bg-[rgba(14,20,17,0.7)] border border-[rgba(236,233,223,0.06)]">
-                            <span className="text-[10px] font-mono text-[#69756d] block mb-1">2. AUTHORIZATION</span>
-                            <div className="text-sm font-mono text-[#ece9df] mb-1 capitalize truncate">
-                              {selectedCandidate.latest_assessment.authorization_state}
-                            </div>
-                            <div className="h-1 rounded-full bg-[rgba(236,233,223,0.08)] overflow-hidden">
-                              <div className={`h-full ${selectedCandidate.latest_assessment.authorization_state === 'authorized' ? 'bg-[#d8f57b]' : 'bg-[#e9ad71]'}`} style={{ width: selectedCandidate.latest_assessment.authorization_state === 'authorized' ? '100%' : '35%' }} />
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center p-4 rounded-xl bg-[rgba(10,14,12,0.9)] border border-[rgba(236,233,223,0.08)]">
+                          {/* Spider Radar Chart Visualizer */}
+                          <div className="md:col-span-5 flex flex-col items-center justify-center py-1">
+                            <RadarSpiderChart
+                              resemblance={selectedCandidate.latest_assessment.identity_resemblance}
+                              authorizationConflict={selectedCandidate.latest_assessment.authorization_conflict}
+                              observedHarm={selectedCandidate.latest_assessment.observed_harm}
+                              evidenceQuality={selectedCandidate.latest_assessment.evidence_quality}
+                              size={260}
+                            />
+                            <div className="text-[10px] font-mono text-[#69756d] text-center mt-1">
+                              Outer ellipse indicates truth boundary uncertainty margin
                             </div>
                           </div>
 
-                          {/* Dim 3: Potential Harm */}
-                          <div className="p-3 rounded-lg bg-[rgba(14,20,17,0.7)] border border-[rgba(236,233,223,0.06)]">
-                            <span className="text-[10px] font-mono text-[#69756d] block mb-1">3. POTENTIAL HARM</span>
-                            <div className={`text-sm font-mono font-semibold uppercase mb-1 ${selectedCandidate.latest_assessment.potential_harm_level === 'high' ? 'text-[#ef8c8c]' : 'text-[#d8f57b]'}`}>
-                              {selectedCandidate.latest_assessment.potential_harm_level}
+                          {/* 4 Dimension Stat Cards */}
+                          <div className="md:col-span-7 grid grid-cols-2 gap-2.5">
+                            {/* Dim 1: Resemblance */}
+                            <div className="p-3 rounded-lg bg-[rgba(14,20,17,0.7)] border border-[rgba(236,233,223,0.06)]">
+                              <span className="text-[10px] font-mono text-[#69756d] block mb-1">1. RESEMBLANCE</span>
+                              <div className="text-xl font-serif text-[#ece9df] mb-1">
+                                {(selectedCandidate.latest_assessment.identity_resemblance * 100).toFixed(0)}%
+                              </div>
+                              <div className="h-1 rounded-full bg-[rgba(236,233,223,0.08)] overflow-hidden">
+                                <div className="h-full bg-[#d8f57b]" style={{ width: `${selectedCandidate.latest_assessment.identity_resemblance * 100}%` }} />
+                              </div>
+                              <span className="text-[9.5px] font-mono text-[#9ba69e] mt-1 block">Lexical &amp; handle similarity</span>
                             </div>
-                            <div className="h-1 rounded-full bg-[rgba(236,233,223,0.08)] overflow-hidden">
-                              <div className={`h-full ${selectedCandidate.latest_assessment.potential_harm_level === 'high' ? 'bg-[#ef8c8c]' : 'bg-[#d8f57b]'}`} style={{ width: `${selectedCandidate.latest_assessment.observed_harm * 100}%` }} />
-                            </div>
-                          </div>
 
-                          {/* Dim 4: Evidence Quality */}
-                          <div className="p-3 rounded-lg bg-[rgba(14,20,17,0.7)] border border-[rgba(236,233,223,0.06)]">
-                            <span className="text-[10px] font-mono text-[#69756d] block mb-1">4. EVIDENCE QUALITY</span>
-                            <div className="text-xl font-serif text-[#9cc4d9] mb-1">
-                              {(selectedCandidate.latest_assessment.evidence_quality * 100).toFixed(0)}%
+                            {/* Dim 2: Authorization */}
+                            <div className="p-3 rounded-lg bg-[rgba(14,20,17,0.7)] border border-[rgba(236,233,223,0.06)]">
+                              <span className="text-[10px] font-mono text-[#69756d] block mb-1">2. AUTH CONFLICT</span>
+                              <div className="text-sm font-mono text-[#ece9df] mb-1 capitalize truncate">
+                                {(selectedCandidate.latest_assessment.authorization_conflict * 100).toFixed(0)}% Conflict
+                              </div>
+                              <div className="h-1 rounded-full bg-[rgba(236,233,223,0.08)] overflow-hidden">
+                                <div className={`h-full ${selectedCandidate.latest_assessment.authorization_conflict < 0.3 ? 'bg-[#d8f57b]' : 'bg-[#e9ad71]'}`} style={{ width: `${selectedCandidate.latest_assessment.authorization_conflict * 100}%` }} />
+                              </div>
+                              <span className="text-[9.5px] font-mono text-[#9ba69e] mt-1 block capitalize truncate">
+                                State: {selectedCandidate.latest_assessment.authorization_state.replace('_', ' ')}
+                              </span>
                             </div>
-                            <div className="h-1 rounded-full bg-[rgba(236,233,223,0.08)] overflow-hidden">
-                              <div className="h-full bg-[#9cc4d9]" style={{ width: `${selectedCandidate.latest_assessment.evidence_quality * 100}%` }} />
+
+                            {/* Dim 3: Potential Harm */}
+                            <div className="p-3 rounded-lg bg-[rgba(14,20,17,0.7)] border border-[rgba(236,233,223,0.06)]">
+                              <span className="text-[10px] font-mono text-[#69756d] block mb-1">3. OBSERVED HARM</span>
+                              <div className={`text-sm font-mono font-semibold uppercase mb-1 ${selectedCandidate.latest_assessment.potential_harm_level === 'high' ? 'text-[#ef8c8c]' : 'text-[#d8f57b]'}`}>
+                                {selectedCandidate.latest_assessment.potential_harm_level} ({(selectedCandidate.latest_assessment.observed_harm * 100).toFixed(0)}%)
+                              </div>
+                              <div className="h-1 rounded-full bg-[rgba(236,233,223,0.08)] overflow-hidden">
+                                <div className={`h-full ${selectedCandidate.latest_assessment.potential_harm_level === 'high' ? 'bg-[#ef8c8c]' : 'bg-[#d8f57b]'}`} style={{ width: `${selectedCandidate.latest_assessment.observed_harm * 100}%` }} />
+                              </div>
+                              <span className="text-[9.5px] font-mono text-[#9ba69e] mt-1 block">Credential / redirect risk</span>
+                            </div>
+
+                            {/* Dim 4: Evidence Quality */}
+                            <div className="p-3 rounded-lg bg-[rgba(14,20,17,0.7)] border border-[rgba(236,233,223,0.06)]">
+                              <span className="text-[10px] font-mono text-[#69756d] block mb-1">4. EVIDENCE QUALITY</span>
+                              <div className="text-xl font-serif text-[#9cc4d9] mb-1">
+                                {(selectedCandidate.latest_assessment.evidence_quality * 100).toFixed(0)}%
+                              </div>
+                              <div className="h-1 rounded-full bg-[rgba(236,233,223,0.08)] overflow-hidden">
+                                <div className="h-full bg-[#9cc4d9]" style={{ width: `${selectedCandidate.latest_assessment.evidence_quality * 100}%` }} />
+                              </div>
+                              <span className="text-[9.5px] font-mono text-[#9ba69e] mt-1 block">
+                                {selectedCandidate.latest_assessment.evidence_quality < 0.6 ? 'High uncertainty margin' : 'Verified provenance proof'}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1498,40 +1729,81 @@ export default function WorkspaceDashboard() {
 
                         <div className="flex flex-wrap gap-2">
                           <button
-                            onClick={() => handleCaseDecision(selectedCandidate.id, 'monitor')}
+                            onClick={() => {
+                              handleCaseDecision(selectedCandidate.id, 'monitor');
+                              playTacticalSound('action');
+                            }}
                             className="px-3 py-1.5 rounded text-xs font-mono bg-[rgba(236,233,223,0.08)] hover:bg-[rgba(236,233,223,0.15)] text-[#ece9df] transition-all"
                           >
                             Monitor Only
                           </button>
 
                           <button
-                            onClick={() => handleCaseDecision(selectedCandidate.id, 'investigate')}
+                            onClick={() => {
+                              handleCaseDecision(selectedCandidate.id, 'investigate');
+                              playTacticalSound('action');
+                            }}
                             className="px-3 py-1.5 rounded text-xs font-mono bg-[rgba(233,173,113,0.15)] hover:bg-[rgba(233,173,113,0.25)] text-[#e9ad71] border border-[rgba(233,173,113,0.3)] transition-all"
                           >
                             Investigate
                           </button>
 
                           <button
-                            onClick={() => handleCaseDecision(selectedCandidate.id, 'insufficient_evidence')}
+                            onClick={() => {
+                              handleCaseDecision(selectedCandidate.id, 'insufficient_evidence');
+                              playTacticalSound('action');
+                            }}
                             className="px-3 py-1.5 rounded text-xs font-mono bg-[rgba(236,233,223,0.06)] hover:bg-[rgba(236,233,223,0.12)] text-[#9ba69e] transition-all"
                           >
                             Insufficient Evidence
                           </button>
 
                           <button
-                            onClick={() => handleCaseDecision(selectedCandidate.id, 'confirmed_impersonation_under_policy')}
+                            onClick={() => {
+                              handleCaseDecision(selectedCandidate.id, 'confirmed_impersonation_under_policy');
+                              playTacticalSound('alert');
+                            }}
                             className="px-3 py-1.5 rounded text-xs font-mono bg-[rgba(239,140,140,0.15)] hover:bg-[rgba(239,140,140,0.25)] text-[#ef8c8c] border border-[rgba(239,140,140,0.3)] transition-all"
                           >
                             Confirm Under Policy
                           </button>
 
-                          <button
-                            onClick={() => handleGenerateReport(selectedCandidate.id)}
-                            className="ml-auto px-3 py-1.5 rounded text-xs font-mono bg-[rgba(216,245,123,0.15)] hover:bg-[rgba(216,245,123,0.25)] text-[#d8f57b] border border-[rgba(216,245,123,0.3)] transition-all flex items-center gap-1.5"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            <span>Generate Report Draft</span>
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2 ml-auto">
+                            <button
+                              onClick={() => {
+                                setShowCertificateModal(true);
+                                playTacticalSound('action');
+                              }}
+                              className="px-3 py-1.5 rounded text-xs font-mono bg-[rgba(156,196,217,0.12)] hover:bg-[rgba(156,196,217,0.22)] text-[#9cc4d9] border border-[rgba(156,196,217,0.25)] transition-all flex items-center gap-1.5"
+                              title="Generate printable ISO/IEC 27037 forensic certificate"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span>Admissibility Certificate</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setShowTakedownModal(true);
+                                playTacticalSound('action');
+                              }}
+                              className="px-3 py-1.5 rounded text-xs font-mono bg-[rgba(233,173,113,0.15)] hover:bg-[rgba(233,173,113,0.25)] text-[#e9ad71] border border-[rgba(233,173,113,0.3)] transition-all flex items-center gap-1.5"
+                              title="Draft legal takedown notice for platform abuse desk"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>Platform Notice</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                handleGenerateReport(selectedCandidate.id);
+                                playTacticalSound('success');
+                              }}
+                              className="px-3 py-1.5 rounded text-xs font-mono bg-[rgba(216,245,123,0.15)] hover:bg-[rgba(216,245,123,0.25)] text-[#d8f57b] border border-[rgba(216,245,123,0.3)] transition-all flex items-center gap-1.5"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>Generate Report</span>
+                            </button>
+                          </div>
                         </div>
 
                         {selectedCandidate.case?.report_drafts?.[0] && (
@@ -1647,8 +1919,8 @@ export default function WorkspaceDashboard() {
                 </p>
               </div>
 
-              {/* Interactive Input Row */}
-              <div className="glass-panel p-6 rounded-xl border border-[rgba(236,233,223,0.12)] space-y-4">
+              {/* Preset Fast Testing Chips & Baseline Selector */}
+              <div className="glass-panel p-5 rounded-xl border border-[rgba(236,233,223,0.12)] space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-mono text-[#9ba69e] block mb-1.5">OFFICIAL BRAND BASELINE</label>
@@ -1656,12 +1928,12 @@ export default function WorkspaceDashboard() {
                       type="text"
                       value={simBase}
                       onChange={(e) => setSimBase(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-[rgba(14,20,17,0.8)] border border-[rgba(236,233,223,0.15)] text-sm font-mono text-[#d8f57b]"
+                      className="w-full h-10 px-3 rounded-lg bg-[rgba(14,20,17,0.8)] border border-[rgba(236,233,223,0.15)] text-sm font-mono text-[#d8f57b] focus:outline-none focus:border-[#d8f57b]"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs font-mono text-[#9ba69e] block mb-1.5">TEST CANDIDATE HANDLE / TITLE</label>
+                    <label className="text-xs font-mono text-[#9ba69e] block mb-1.5">TEST CANDIDATE HANDLE / DOMAIN / TITLE</label>
                     <input
                       type="text"
                       value={simInput}
@@ -1672,85 +1944,53 @@ export default function WorkspaceDashboard() {
                   </div>
                 </div>
 
-                {/* Preset Fast Testing Chips */}
-                <div className="flex flex-wrap items-center gap-2 pt-2">
-                  <span className="text-[11px] font-mono text-[#69756d]">TEST PRESETS:</span>
+                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[rgba(236,233,223,0.06)]">
+                  <span className="text-[11px] font-mono text-[#69756d]">QUICK ATTACK PRESETS:</span>
                   <button
-                    onClick={() => setSimInput('Northstаr Pay')} // with Cyrillic 'а'
+                    onClick={() => {
+                      setSimInput('Northstаr Pay'); // with Cyrillic 'а' (U+0430)
+                      playTacticalSound('action');
+                    }}
                     className="px-2.5 py-1 rounded bg-[rgba(14,20,17,0.8)] hover:bg-[rgba(216,245,123,0.08)] text-[11px] font-mono text-[#d8f57b] border border-[rgba(236,233,223,0.08)]"
                   >
                     Cyrillic &apos;а&apos; Swap
                   </button>
                   <button
-                    onClick={() => setSimInput('Northstar Pay Support')}
+                    onClick={() => {
+                      setSimInput('N0rthst4r P@y'); // Leetspeak substitution
+                      playTacticalSound('action');
+                    }}
                     className="px-2.5 py-1 rounded bg-[rgba(14,20,17,0.8)] hover:bg-[rgba(216,245,123,0.08)] text-[11px] font-mono text-[#e9ad71] border border-[rgba(236,233,223,0.08)]"
                   >
-                    Inserted &quot;Support&quot; Word
+                    Leetspeak Matrix (&apos;0&apos; &amp; &apos;4&apos;)
                   </button>
                   <button
-                    onClick={() => setSimInput('Northstar_Pay')}
-                    className="px-2.5 py-1 rounded bg-[rgba(14,20,17,0.8)] hover:bg-[rgba(216,245,123,0.08)] text-[11px] font-mono text-[#ece9df] border border-[rgba(236,233,223,0.08)]"
+                    onClick={() => {
+                      setSimInput('Northstar Pay Support & Emergency Help');
+                      playTacticalSound('action');
+                    }}
+                    className="px-2.5 py-1 rounded bg-[rgba(14,20,17,0.8)] hover:bg-[rgba(216,245,123,0.08)] text-[11px] font-mono text-[#ef8c8c] border border-[rgba(236,233,223,0.08)]"
                   >
-                    Separator Mutation
+                    High-Risk Keyword Insertion
                   </button>
                   <button
-                    onClick={() => setSimInput('Northstar Pay Official Social')}
+                    onClick={() => {
+                      setSimInput('Northstar Pay Official Social');
+                      playTacticalSound('action');
+                    }}
                     className="px-2.5 py-1 rounded bg-[rgba(14,20,17,0.8)] hover:bg-[rgba(216,245,123,0.08)] text-[11px] font-mono text-[#9cc4d9] border border-[rgba(236,233,223,0.08)]"
                   >
-                    Official Registered Asset
+                    Registered Official Asset
                   </button>
                 </div>
               </div>
 
-              {/* Realtime Decomposition Results */}
-              {simAnalysis && (
-                <div className="glass-panel p-6 rounded-xl border border-[rgba(236,233,223,0.12)] space-y-4">
-                  <div className="flex items-center justify-between border-b border-[rgba(236,233,223,0.08)] pb-3">
-                    <span className="text-xs font-mono uppercase text-[#69756d]">DETECTION VERDICT</span>
-                    <span className={`text-xs font-mono font-bold uppercase px-3 py-1 rounded ${
-                      simAnalysis.isAuthorized
-                        ? 'bg-[rgba(216,245,123,0.15)] text-[#d8f57b]'
-                        : simAnalysis.hasCyrillic || simAnalysis.foundAffixes.length > 0
-                        ? 'bg-[rgba(239,140,140,0.15)] text-[#ef8c8c]'
-                        : 'bg-[rgba(233,173,113,0.15)] text-[#e9ad71]'
-                    }`}>
-                      {simAnalysis.triageDecision}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
-                    <div className="p-3 rounded bg-[rgba(14,20,17,0.6)] border border-[rgba(236,233,223,0.06)]">
-                      <span className="text-[#69756d] block mb-1">UNICODE HOMOGLYPHS:</span>
-                      {simAnalysis.hasCyrillic ? (
-                        <span className="text-[#ef8c8c] font-semibold flex items-center gap-1">
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                          {simAnalysis.cyrillicCount} Cyrillic characters detected
-                        </span>
-                      ) : (
-                        <span className="text-[#d8f57b]">Clean Latin skeleton (0 homoglyphs)</span>
-                      )}
-                    </div>
-
-                    <div className="p-3 rounded bg-[rgba(14,20,17,0.6)] border border-[rgba(236,233,223,0.06)]">
-                      <span className="text-[#69756d] block mb-1">HIGH-RISK INSERTIONS:</span>
-                      {simAnalysis.foundAffixes.length > 0 ? (
-                        <span className="text-[#e9ad71] font-semibold">
-                          Found: {simAnalysis.foundAffixes.join(', ')}
-                        </span>
-                      ) : (
-                        <span className="text-[#9ba69e]">No risky keyword affixes</span>
-                      )}
-                    </div>
-
-                    <div className="p-3 rounded bg-[rgba(14,20,17,0.6)] border border-[rgba(236,233,223,0.06)]">
-                      <span className="text-[#69756d] block mb-1">TOKEN OVERLAP:</span>
-                      <span className="text-[#d8f57b] font-semibold">
-                        {simAnalysis.tokenSimilarity}% lexical match
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Advanced Forensic Code-Point Inspector Component */}
+              <HomoglyphInspector
+                candidateText={simInput}
+                baselineText={simBase}
+                onFeedIntoQueue={handleQueueSimulatedFinding}
+              />
             </div>
           )}
 
@@ -1987,6 +2227,33 @@ export default function WorkspaceDashboard() {
             </div>
           </div>
         </div>
+      )}
+      {/* ========================================================
+          MODAL: COURT EVIDENCE CERTIFICATE (ISO/IEC 27037)
+          ======================================================== */}
+      {selectedCandidate && (
+        <EvidenceCertificateModal
+          isOpen={showCertificateModal}
+          onClose={() => setShowCertificateModal(false)}
+          candidate={selectedCandidate}
+          brandName={brand.name}
+        />
+      )}
+
+      {/* ========================================================
+          MODAL: PLATFORM TAKEDOWN & ABUSE DESK NOTICE
+          ======================================================== */}
+      {selectedCandidate && (
+        <TakedownNoticeModal
+          isOpen={showTakedownModal}
+          onClose={() => setShowTakedownModal(false)}
+          candidate={selectedCandidate}
+          brandName={brand.name}
+          onNoticeDispatched={(platform) => {
+            triggerToast(`Dispatched ${platform.toUpperCase()} notice. Cryptographic record added.`);
+            playTacticalSound('success');
+          }}
+        />
       )}
     </div>
   );
