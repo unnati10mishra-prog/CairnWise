@@ -3,21 +3,18 @@ import Link from 'next/link';
 interface BrandLogoProps {
   size?: 'sm' | 'md' | 'lg';
   showSubtitle?: boolean;
+  asLink?: boolean;
 }
 
-export function BrandLogo({ size = 'md', showSubtitle = false }: BrandLogoProps) {
+export function BrandLogo({ size = 'md', showSubtitle = false, asLink = true }: BrandLogoProps) {
   const sizeClasses = {
     sm: { text: 'text-lg', mark: 'scale-90', sub: 'text-[10px]' },
     md: { text: 'text-2xl', mark: 'scale-100', sub: 'text-xs' },
     lg: { text: 'text-3xl', mark: 'scale-125', sub: 'text-xs' },
   }[size];
 
-  return (
-    <Link 
-      href="/" 
-      className="inline-flex items-center gap-3 group focus:outline-none"
-      aria-label="Cairnwise Home"
-    >
+  const content = (
+    <>
       <div className={`brand-mark-cairn ${sizeClasses.mark}`} aria-hidden="true" />
       <div className="flex flex-col">
         <span 
@@ -35,6 +32,24 @@ export function BrandLogo({ size = 'md', showSubtitle = false }: BrandLogoProps)
           </span>
         )}
       </div>
+    </>
+  );
+
+  if (!asLink) {
+    return (
+      <div className="inline-flex items-center gap-3 group">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link 
+      href="/" 
+      className="inline-flex items-center gap-3 group focus:outline-none"
+      aria-label="Cairnwise Home"
+    >
+      {content}
     </Link>
   );
 }

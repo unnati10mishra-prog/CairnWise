@@ -758,9 +758,7 @@ export default function WorkspaceDashboard() {
       {/* Top Application Bar */}
       <header className="h-16 px-6 border-b border-[rgba(236,233,223,0.08)] bg-[rgba(9,12,11,0.85)] backdrop-blur-md flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-6">
-          <Link href="/" className="hover:opacity-90 transition-opacity flex items-center">
-            <BrandLogo size="md" showSubtitle={false} />
-          </Link>
+          <BrandLogo size="md" showSubtitle={false} />
           <div className="hidden md:flex items-center gap-2 pl-4 border-l border-[rgba(236,233,223,0.1)] text-xs font-mono">
             <span className="text-[#69756d]">BASELINE:</span>
             <span className="text-[#ece9df] font-medium">{brand.name}</span>
