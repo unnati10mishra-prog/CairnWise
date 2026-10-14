@@ -9,6 +9,12 @@ import { HomoglyphInspector } from '@/components/HomoglyphInspector';
 import { EvidenceCertificateModal } from '@/components/EvidenceCertificateModal';
 import { TakedownNoticeModal } from '@/components/TakedownNoticeModal';
 import { CommandPalette } from '@/components/CommandPalette';
+import { ForensicWorkflowModal } from '@/components/ForensicWorkflowModal';
+import { SubmitNewIntakeModal } from '@/components/SubmitNewIntakeModal';
+import { SourceDiagnosticModal } from '@/components/SourceDiagnosticModal';
+import { WorkspaceSwitcherModal } from '@/components/WorkspaceSwitcherModal';
+import { TruthBoundaryModal } from '@/components/TruthBoundaryModal';
+import { AnalystProfileModal } from '@/components/AnalystProfileModal';
 import { getSupabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { 
@@ -17,12 +23,14 @@ import {
   LogOut, 
   Layers, 
   CheckCircle2, 
+  ShieldCheck, 
   AlertTriangle, 
   Filter, 
   Search, 
   Download, 
   ExternalLink,
   ChevronRight,
+  ChevronDown,
   Database,
   Lock,
   Sparkles,
@@ -33,9 +41,11 @@ import {
   FileText,
   Activity,
   Sliders,
+  SlidersHorizontal,
   Scale,
   ShieldAlert,
   ArrowRight,
+  ArrowLeftRight,
   Globe,
   Smartphone,
   Eye,
@@ -55,6 +65,7 @@ import {
   Printer,
   Send,
   Zap,
+  FlaskConical,
 } from 'lucide-react';
 
 // ==========================================
@@ -520,6 +531,17 @@ export default function WorkspaceDashboard() {
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [showTakedownModal, setShowTakedownModal] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
+  const [showTruthModal, setShowTruthModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showWorkflowDetailsModal, setShowWorkflowDetailsModal] = useState(false);
+  const [selectedWorkflowStep, setSelectedWorkflowStep] = useState<number>(1);
+  const [showSourceTestModal, setShowSourceTestModal] = useState(false);
+  const [selectedSourceForTest, setSelectedSourceForTest] = useState<{
+    name: string;
+    type: string;
+    status: string;
+  } | null>(null);
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -970,6 +992,200 @@ export default function WorkspaceDashboard() {
     };
   }, [simInput, simBase, assets]);
 
+  // Ingest handler for SubmitNewIntakeModal
+  const handleIngestNewCandidate = (data: {
+    assetType: 'social_profile' | 'mobile_app';
+    platform: string;
+    identity: string;
+    displayName: string;
+    publisher?: string;
+    bio: string;
+    destinationUrl: string;
+    iconSimilarity: number;
+    scores: {
+      resemblance: number;
+      conflict: number;
+      harm: number;
+      risk: number;
+    };
+  }) => {
+    const isOfficial = data.scores.conflict < 0.1;
+    const newCandId = `cand_custom_${Date.now()}`;
+    const newIntakeId = `INT-2026-0${candidates.length + 104}`;
+
+    const newCandidate: CandidateIncident = {
+      id: newCandId,
+      asset_type: data.assetType,
+      source_identity: data.identity,
+      review_state: isOfficial ? 'authorized' : 'triaged',
+      latest_observation: {
+        source_mode: 'live_observation',
+        availability_state: 'available',
+        observed_at: 'Just now',
+        raw: {
+          display_name: data.displayName,
+          handle: data.identity,
+          title: data.displayName,
+          publisher: data.publisher,
+          bio: data.bio,
+          description: data.bio,
+          destination_url: data.destinationUrl,
+          icon_similarity: data.iconSimilarity,
+        },
+      },
+      latest_assessment: {
+        identity_resemblance: data.scores.resemblance,
+        authorization_state: isOfficial ? 'authorized' : 'unknown',
+        authorization_conflict: data.scores.conflict,
+        potential_harm_level: data.scores.risk >= 0.8 ? 'high' : data.scores.risk >= 0.5 ? 'medium' : 'low',
+        observed_harm: data.scores.harm,
+        evidence_quality: 0.94,
+        queue_priority: data.scores.risk,
+        decision_state: isOfficial ? 'authorized' : 'review_required',
+        reasons: isOfficial
+          ? ['official_asset_firewall_match:stable_external_id']
+          : [
+              `lexical_resemblance_score:${(data.scores.resemblance * 100).toFixed(0)}%`,
+              `visual_perceptual_hash:${(data.iconSimilarity * 100).toFixed(0)}%`,
+              data.publisher ? `unrecognized_store_publisher:${data.publisher}` : 'unverified_external_handle',
+            ],
+        counterevidence: isOfficial ? ['cryptographic_registry_anchor_verified'] : [],
+        missing: isOfficial ? [] : ['official_domain_match', 'corporate_email_verification'],
+      },
+      evidence: [
+        {
+          id: `ev_obs_${Date.now()}`,
+          evidence_type: 'observation_snapshot',
+          excerpt: `Intake observation: "${data.displayName}" (${data.identity}). Platform: ${data.platform}`,
+          integrity_hash: '9f83c18b76e42b6a9c1e7d8a63f104e84b238e83b4b88a9134b281f6294711fa',
+          captured_at: '2026-10-14T10:00:00Z',
+          source_locator: `cairnwise.intake.${data.platform}#live`,
+        },
+        {
+          id: `ev_tri_${Date.now()}`,
+          evidence_type: '4d_signal_triangulation',
+          excerpt: `4D Triangulation: Resemblance ${data.scores.resemblance}, Conflict ${data.scores.conflict}, Harm ${data.scores.harm}. Composite Risk ${data.scores.risk}.`,
+          integrity_hash: 'c83b4a2f8910e54d89e210b3724a1b02c81e9204857b2930471b3e94821a7f34',
+          captured_at: '2026-10-14T10:00:01Z',
+          source_locator: 'cairnwise.detector.triangulation#v2',
+        },
+      ],
+    };
+
+    setCandidates(prev => [newCandidate, ...prev]);
+    setSelectedCandidate(newCandidate);
+    setActiveTab('queue');
+    triggerToast(`Observation ${newIntakeId} ingested and triangulated (Risk: ${data.scores.risk}).`);
+    playTacticalSound(data.scores.risk > 0.7 ? 'alert' : 'action');
+  };
+
+  const handleSourceAction = (name: string, actionType: string) => {
+    setSelectedSourceForTest({
+      name,
+      type: actionType,
+      status: actionType === 'connect' ? 'Not configured' : actionType === 'configure' ? 'Disabled' : 'Fixture data',
+    });
+    setShowSourceTestModal(true);
+    playTacticalSound('action');
+  };
+
+  const renderPlatformIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'x':
+      case 'twitter':
+        return (
+          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+        );
+      case 'instagram':
+        return (
+          <svg className="w-3.5 h-3.5 stroke-current fill-none stroke-2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
+            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+            <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+          </svg>
+        );
+      case 'youtube':
+        return (
+          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+        );
+      case 'tiktok':
+        return (
+          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298-.002.595.042.88.13V9.4a6.33 6.33 0 0 0-1-.08A6.34 6.34 0 0 0 3 15.66a6.34 6.34 0 0 0 10.82 4.47 6.28 6.28 0 0 0 1.94-4.52V8.44a8.27 8.27 0 0 0 4.83 1.54V6.69h-1z"/>
+          </svg>
+        );
+      case 'google_play':
+        return (
+          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <path d="M3.609 1.814L13.793 12 3.61 22.186a1.5 1.5 0 0 1-.61-.703V2.517c0-.263.22-.505.609-.703zm11.305 11.307l2.253 2.253-11.83 6.786 9.577-9.039zm2.254-2.242l3.435 1.97a1.14 1.14 0 0 1 0 1.97l-3.435 1.97-2.37-2.37 2.37-2.37zm-2.254-2.242L5.337 2.84l11.83 6.786-2.253 2.011z"/>
+          </svg>
+        );
+      case 'apple':
+      case 'apple_app_store':
+        return (
+          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.61-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.35-.58.66-1.09 1.73-.95 2.76.99.08 2.07-.51 2.68-1.26z"/>
+          </svg>
+        );
+      case 'bluesky':
+        return (
+          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+            <path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566 1.01 1.01 1.625.32 2.628c-.835 1.21-.433 3.993.434 5.923.868 1.93 2.57 3.447 4.07 4.25-1.5-.2-3.69-.03-5.26 1.03C-.9 14.15-.17 16.9.54 18.04c1.23 1.96 5.37 2.37 8.01.8 2.64-1.57 3.45-3.6 3.45-3.6s.81 2.03 3.45 3.6c2.64 1.57 6.78 1.16 8.01-.8.71-1.14 1.44-3.89-1.01-4.21-1.57-1.06-3.76-1.23-5.26-1.03 1.5-.803 3.202-2.32 4.07-4.25.867-1.93 1.269-4.713.434-5.923-.69-1.003-2.246-1.618-4.882.177C16.046 4.747 13.087 8.686 12 10.8z"/>
+          </svg>
+        );
+      default:
+        return <Globe className="w-3.5 h-3.5" />;
+    }
+  };
+
+  const intakeRows = useMemo(() => {
+    return [
+      {
+        id: 'row_1',
+        ref: 'INT-2026-0103',
+        typeLabel: 'Social Profile',
+        icon: 'x',
+        title: 'Social profile look-alike test',
+        details: '@northstar_pay_support · Character substitution · credential-bait bio',
+        sourceName: 'X (Twitter)',
+        risk: 0.83,
+        status: 'Review',
+        updated: '2 hours ago',
+        candidate: candidates.find(c => c.id === 'cand_social_lookalike_01') || candidates[0],
+      },
+      {
+        id: 'row_2',
+        ref: 'INT-2026-0102',
+        typeLabel: 'App Listing',
+        icon: 'google_play',
+        title: 'Counterfeit app publisher mismatch',
+        details: 'Similar title and icon · publisher differs',
+        sourceName: 'Google Play',
+        risk: 0.91,
+        status: 'High',
+        updated: '5 hours ago',
+        candidate: candidates.find(c => c.id === 'cand_app_lookalike_02') || candidates[1],
+      },
+      ...candidates.filter(c => c.id !== 'cand_social_lookalike_01' && c.id !== 'cand_app_lookalike_02' && c.id !== 'cand_partner_exception_03' && c.id !== 'cand_official_control_04').map((c, i) => ({
+        id: c.id,
+        ref: `INT-2026-0${104 + i}`,
+        typeLabel: c.asset_type === 'social_profile' ? 'Social Profile' : 'App Listing',
+        icon: c.asset_type === 'social_profile' ? 'x' : 'google_play',
+        title: c.latest_observation?.raw?.display_name || c.source_identity,
+        details: c.latest_observation?.raw?.bio || c.latest_observation?.raw?.description || 'Live observation',
+        sourceName: c.asset_type === 'social_profile' ? 'X (Twitter)' : 'Google Play',
+        risk: c.latest_assessment.queue_priority || 0.85,
+        status: c.latest_assessment.potential_harm_level === 'high' ? 'High' : 'Review',
+        updated: 'Just now',
+        candidate: c,
+      })),
+    ];
+  }, [candidates]);
+
   return (
     <div className="min-h-screen bg-[#070908] text-[#f2efe7] flex flex-col font-sans selection:bg-[#d8f57b] selection:text-[#131b0e]">
       {/* Toast Notification Container */}
@@ -981,63 +1197,54 @@ export default function WorkspaceDashboard() {
       )}
 
       {/* Top Application Bar */}
-      <header className="h-16 px-6 border-b border-[rgba(236,233,223,0.08)] bg-[rgba(9,12,11,0.85)] backdrop-blur-md flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-6">
-          <BrandLogo size="md" showSubtitle={false} />
-          <div className="hidden md:flex items-center gap-2 pl-4 border-l border-[rgba(236,233,223,0.1)] text-xs font-mono">
-            <span className="text-[#69756d]">BASELINE:</span>
-            <span className="text-[#ece9df] font-medium">{brand.name}</span>
-            <span className="text-[#69756d]">({brand.locale})</span>
-          </div>
+      <header className="h-16 px-6 border-b border-[rgba(236,233,223,0.08)] bg-[rgba(9,12,11,0.92)] backdrop-blur-md flex items-center justify-between sticky top-0 z-40">
+        <div className="flex items-center gap-4">
+          <BrandLogo size="md" showSubtitle={false} asLink={true} />
+          
+          {/* Workspace selector dropdown */}
+          <button
+            onClick={() => {
+              setShowWorkspaceModal(true);
+              playTacticalSound('action');
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-[rgba(236,233,223,0.04)] hover:bg-[rgba(236,233,223,0.08)] border border-[rgba(236,233,223,0.1)] text-[#ece9df] transition-all cursor-pointer group"
+          >
+            <span className="font-semibold tracking-wide uppercase">{brand.name}</span>
+            <span className="text-[#69756d]">·</span>
+            <span className="text-[#9ba69e]">{brand.locale}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-[#69756d] group-hover:text-[#d8f57b] transition-colors ml-0.5" />
+          </button>
         </div>
 
-        {/* Center: Live Sync & Truth Boundary Indicator */}
-        <div className="hidden lg:flex items-center gap-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(216,245,123,0.06)] border border-[rgba(216,245,123,0.2)] text-[10.5px] font-mono text-[#d8f57b] tracking-wider uppercase">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#d8f57b] animate-pulse" />
-            <span>TRUTH BOUNDARY ACTIVE &bull; 4D SIGNAL TRIANGULATION</span>
-          </div>
-          <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[10px] font-mono tracking-wider border ${
-            isLiveConnected
-              ? 'bg-[rgba(110,231,183,0.08)] text-[#6ee7b7] border-[rgba(110,231,183,0.3)]'
-              : 'bg-[rgba(233,173,113,0.08)] text-[#e9ad71] border-[rgba(233,173,113,0.25)]'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isLiveConnected ? 'bg-[#6ee7b7] animate-ping' : 'bg-[#e9ad71]'}`} />
-            <span>{isLiveConnected ? 'SUPABASE REALTIME SYNC' : 'STANDALONE FORENSIC ENGINE'}</span>
-          </div>
+        {/* Center: Truth Boundary Indicator */}
+        <div className="hidden md:flex items-center">
+          <button
+            onClick={() => {
+              setShowTruthModal(true);
+              playTacticalSound('action');
+            }}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[rgba(14,20,17,0.85)] border border-[rgba(236,233,223,0.1)] hover:border-[rgba(216,245,123,0.3)] text-xs text-[#ece9df] transition-all cursor-pointer shadow-sm group"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#84cc16] shadow-[0_0_8px_rgba(132,204,22,0.6)]" />
+            <span className="font-semibold text-[#84cc16]">Truth boundary active</span>
+            <span className="text-[#69756d]">·</span>
+            <span className="text-[#9ba69e]">Fixture &amp; observation audited</span>
+            <Info className="w-3.5 h-3.5 text-[#9ba69e] group-hover:text-[#84cc16] transition-colors ml-0.5" />
+          </button>
         </div>
 
         {/* Right Operator Controls */}
         <div className="flex items-center gap-3">
-          {/* Global Command Palette Trigger */}
           <button
             onClick={() => {
               setShowCommandPalette(true);
               playTacticalSound('action');
             }}
-            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-mono bg-[rgba(236,233,223,0.06)] hover:bg-[rgba(216,245,123,0.12)] text-[#9ba69e] hover:text-[#d8f57b] border border-[rgba(236,233,223,0.1)] hover:border-[rgba(216,245,123,0.3)] transition-all"
-            title="Open Apex Command Palette (Cmd + K)"
+            className="p-2 rounded-lg text-[#9ba69e] hover:text-[#f2efe7] hover:bg-[rgba(236,233,223,0.06)] border border-transparent hover:border-[rgba(236,233,223,0.1)] transition-all cursor-pointer"
+            title="Search or jump to command (Cmd+K)"
           >
-            <Terminal className="w-3.5 h-3.5 text-[#d8f57b]" />
-            <span>Cmd+K</span>
+            <Search className="w-4 h-4" />
           </button>
-
-          {/* Tactical Audio Feedback Toggle */}
-          <button
-            onClick={() => {
-              setAudioEnabled(!audioEnabled);
-              triggerToast(audioEnabled ? 'Tactical audio cues muted' : 'Tactical audio cues enabled');
-            }}
-            title={audioEnabled ? "Mute audio cues" : "Enable audio cues"}
-            className="p-1.5 rounded text-[#9ba69e] hover:text-[#d8f57b] hover:bg-[rgba(216,245,123,0.08)] transition-all"
-          >
-            {audioEnabled ? <Volume2 className="w-4 h-4 text-[#d8f57b]" /> : <VolumeX className="w-4 h-4 text-[#69756d]" />}
-          </button>
-
-          <div className="hidden sm:flex items-center gap-2 text-xs font-mono px-2.5 py-1 rounded border border-[rgba(236,233,223,0.08)] bg-[rgba(14,20,17,0.6)]">
-            <UserCheck className="w-3.5 h-3.5 text-[#d8f57b]" />
-            <span className="text-[#9ba69e] truncate max-w-[150px]">{user?.email || 'elena.vance@northstar.security'}</span>
-          </div>
 
           <button
             onClick={() => {
@@ -1045,21 +1252,27 @@ export default function WorkspaceDashboard() {
               playTacticalSound('action');
             }}
             title="Reset to deterministic baseline"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono bg-[rgba(216,245,123,0.08)] hover:bg-[rgba(216,245,123,0.15)] text-[#d8f57b] border border-[rgba(216,245,123,0.25)] transition-all"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium text-[#d8f57b] bg-[rgba(216,245,123,0.06)] hover:bg-[rgba(216,245,123,0.12)] border border-[rgba(216,245,123,0.25)] transition-all cursor-pointer"
           >
-            <RefreshCw className="w-3 h-3" />
-            <span>Seed Fixtures</span>
+            <FlaskConical className="w-3.5 h-3.5 text-[#d8f57b]" />
+            <span>Seed fixtures</span>
           </button>
 
           <button
             onClick={() => {
-              signOut();
-              router.push('/login');
+              setShowProfileModal(true);
+              playTacticalSound('action');
             }}
-            title="Sign out of console"
-            className="p-1.5 rounded text-[#9ba69e] hover:text-[#ef8c8c] hover:bg-[rgba(239,140,140,0.08)] transition-all"
+            title="Analyst Profile"
+            className="flex items-center gap-2.5 pl-2 py-1 pr-2 rounded-lg hover:bg-[rgba(236,233,223,0.05)] transition-all text-left cursor-pointer group"
           >
-            <LogOut className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-full bg-[#1b221d] border border-[rgba(236,233,223,0.15)] flex items-center justify-center text-xs font-mono font-medium text-[#ece9df] group-hover:border-[#d8f57b] transition-colors">
+              EV
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-xs font-semibold text-[#ece9df] leading-tight">Elena Vance</span>
+              <span className="text-[10px] font-mono text-[#9ba69e] leading-tight">northstar.security</span>
+            </div>
           </button>
         </div>
       </header>
@@ -1070,13 +1283,13 @@ export default function WorkspaceDashboard() {
         <aside className="w-64 border-r border-[rgba(236,233,223,0.08)] bg-[rgba(10,14,12,0.95)] flex flex-col justify-between p-4 flex-shrink-0 overflow-y-auto">
           <div className="space-y-6">
             <div>
-              <div className="text-[10px] font-mono tracking-widest text-[#69756d] uppercase mb-3 px-3">
-                OPERATIONAL PHASES
+              <div className="text-[11px] font-mono tracking-wider text-[#69756d] uppercase mb-3 px-3">
+                OPERATIONS
               </div>
               <nav className="space-y-1">
                 <button
-                  onClick={() => setActiveTab('overview')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                  onClick={() => { setActiveTab('overview'); playTacticalSound('action'); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     activeTab === 'overview'
                       ? 'bg-[rgba(216,245,123,0.12)] text-[#d8f57b] border border-[rgba(216,245,123,0.3)] shadow-[0_0_12px_rgba(216,245,123,0.1)]'
                       : 'text-[#9ba69e] hover:text-[#f2efe7] hover:bg-[rgba(236,233,223,0.04)] border border-transparent'
@@ -1087,8 +1300,8 @@ export default function WorkspaceDashboard() {
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('registry')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                  onClick={() => { setActiveTab('registry'); playTacticalSound('action'); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     activeTab === 'registry'
                       ? 'bg-[rgba(216,245,123,0.12)] text-[#d8f57b] border border-[rgba(216,245,123,0.3)] shadow-[0_0_12px_rgba(216,245,123,0.1)]'
                       : 'text-[#9ba69e] hover:text-[#f2efe7] hover:bg-[rgba(236,233,223,0.04)] border border-transparent'
@@ -1096,14 +1309,14 @@ export default function WorkspaceDashboard() {
                 >
                   <Database className="w-4 h-4 flex-shrink-0" />
                   <span>Identity Registry</span>
-                  <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-[rgba(236,233,223,0.08)] text-[#9ba69e]">
+                  <span className="ml-auto text-[11px] font-mono px-2 py-0.5 rounded bg-[rgba(236,233,223,0.06)] text-[#9ba69e]">
                     {assets.length}
                   </span>
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('queue')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                  onClick={() => { setActiveTab('queue'); playTacticalSound('action'); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     activeTab === 'queue'
                       ? 'bg-[rgba(216,245,123,0.12)] text-[#d8f57b] border border-[rgba(216,245,123,0.3)] shadow-[0_0_12px_rgba(216,245,123,0.1)]'
                       : 'text-[#9ba69e] hover:text-[#f2efe7] hover:bg-[rgba(236,233,223,0.04)] border border-transparent'
@@ -1111,14 +1324,14 @@ export default function WorkspaceDashboard() {
                 >
                   <ShieldAlert className="w-4 h-4 flex-shrink-0 text-[#e9ad71]" />
                   <span>Review Queue</span>
-                  <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-[rgba(233,173,113,0.15)] text-[#e9ad71] font-semibold">
+                  <span className="ml-auto text-[11px] font-mono px-2 py-0.5 rounded bg-[rgba(233,173,113,0.12)] text-[#e9ad71] font-semibold">
                     {metrics.openReviewCount}
                   </span>
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('coverage')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                  onClick={() => { setActiveTab('coverage'); playTacticalSound('action'); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     activeTab === 'coverage'
                       ? 'bg-[rgba(216,245,123,0.12)] text-[#d8f57b] border border-[rgba(216,245,123,0.3)] shadow-[0_0_12px_rgba(216,245,123,0.1)]'
                       : 'text-[#9ba69e] hover:text-[#f2efe7] hover:bg-[rgba(236,233,223,0.04)] border border-transparent'
@@ -1126,14 +1339,14 @@ export default function WorkspaceDashboard() {
                 >
                   <Radio className="w-4 h-4 flex-shrink-0" />
                   <span>Coverage Contract</span>
-                  <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-[rgba(216,245,123,0.08)] text-[#d8f57b]">
+                  <span className="ml-auto text-[11px] font-mono px-2 py-0.5 rounded bg-[rgba(236,233,223,0.06)] text-[#9ba69e]">
                     {connectors.length}
                   </span>
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('simulator')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                  onClick={() => { setActiveTab('simulator'); playTacticalSound('action'); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     activeTab === 'simulator'
                       ? 'bg-[rgba(216,245,123,0.12)] text-[#d8f57b] border border-[rgba(216,245,123,0.3)] shadow-[0_0_12px_rgba(216,245,123,0.1)]'
                       : 'text-[#9ba69e] hover:text-[#f2efe7] hover:bg-[rgba(236,233,223,0.04)] border border-transparent'
@@ -1141,14 +1354,14 @@ export default function WorkspaceDashboard() {
                 >
                   <Sliders className="w-4 h-4 flex-shrink-0 text-[#d8f57b]" />
                   <span>Look-alike Simulator</span>
-                  <span className="ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded bg-[rgba(216,245,123,0.1)] text-[#d8f57b]">
+                  <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-[rgba(216,245,123,0.1)] text-[#d8f57b] font-semibold">
                     BONUS
                   </span>
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('audit')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                  onClick={() => { setActiveTab('audit'); playTacticalSound('action'); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     activeTab === 'audit'
                       ? 'bg-[rgba(216,245,123,0.12)] text-[#d8f57b] border border-[rgba(216,245,123,0.3)] shadow-[0_0_12px_rgba(216,245,123,0.1)]'
                       : 'text-[#9ba69e] hover:text-[#f2efe7] hover:bg-[rgba(236,233,223,0.04)] border border-transparent'
@@ -1160,51 +1373,42 @@ export default function WorkspaceDashboard() {
               </nav>
             </div>
 
-            {/* Quick Fixture Test Triggers */}
+            {/* Analysis Tools Section */}
             <div className="pt-4 border-t border-[rgba(236,233,223,0.06)]">
-              <div className="text-[10px] font-mono tracking-widest text-[#69756d] uppercase mb-2 px-3">
-                FIXTURE TEST BENCH
+              <div className="text-[11px] font-mono tracking-wider text-[#69756d] uppercase mb-2 px-3">
+                ANALYSIS TOOLS
               </div>
               <div className="grid grid-cols-1 gap-1.5">
                 <button
                   onClick={() => handleRunFixture('social.lookalike')}
-                  className="w-full text-left px-3 py-2 rounded text-[11px] font-mono text-[#ece9df] bg-[rgba(14,20,17,0.6)] hover:bg-[rgba(216,245,123,0.08)] hover:text-[#d8f57b] transition-all flex items-center justify-between"
+                  className="w-full text-left px-3 py-2 rounded text-[11px] font-mono text-[#ece9df] bg-[rgba(14,20,17,0.6)] hover:bg-[rgba(216,245,123,0.08)] hover:text-[#d8f57b] transition-all flex items-center justify-between cursor-pointer"
                 >
                   <span>Social Look-alike</span>
-                  <span className="text-[10px] text-[#e9ad71]">0.88</span>
+                  <span className="text-[11px] font-semibold text-[#e9ad71]">0.88</span>
                 </button>
                 <button
                   onClick={() => handleRunFixture('app.lookalike')}
-                  className="w-full text-left px-3 py-2 rounded text-[11px] font-mono text-[#ece9df] bg-[rgba(14,20,17,0.6)] hover:bg-[rgba(216,245,123,0.08)] hover:text-[#d8f57b] transition-all flex items-center justify-between"
+                  className="w-full text-left px-3 py-2 rounded text-[11px] font-mono text-[#ece9df] bg-[rgba(14,20,17,0.6)] hover:bg-[rgba(216,245,123,0.08)] hover:text-[#d8f57b] transition-all flex items-center justify-between cursor-pointer"
                 >
                   <span>App Look-alike</span>
-                  <span className="text-[10px] text-[#ef8c8c]">High</span>
+                  <span className="text-[11px] font-semibold text-[#ef8c8c]">High</span>
                 </button>
                 <button
                   onClick={() => handleRunFixture('social.official')}
-                  className="w-full text-left px-3 py-2 rounded text-[11px] font-mono text-[#ece9df] bg-[rgba(14,20,17,0.6)] hover:bg-[rgba(216,245,123,0.08)] hover:text-[#d8f57b] transition-all flex items-center justify-between"
+                  className="w-full text-left px-3 py-2 rounded text-[11px] font-mono text-[#ece9df] bg-[rgba(14,20,17,0.6)] hover:bg-[rgba(216,245,123,0.08)] hover:text-[#d8f57b] transition-all flex items-center justify-between cursor-pointer"
                 >
                   <span>Official Control</span>
-                  <span className="text-[10px] text-[#d8f57b]">Firewall</span>
+                  <span className="text-[11px] font-semibold text-[#84cc16]">Firewall</span>
                 </button>
                 <button
                   onClick={() => handleRunFixture('source.outage')}
-                  className="w-full text-left px-3 py-2 rounded text-[11px] font-mono text-[#ef8c8c] bg-[rgba(239,140,140,0.05)] hover:bg-[rgba(239,140,140,0.1)] transition-all flex items-center justify-between"
+                  className="w-full text-left px-3 py-2 rounded text-[11px] font-mono text-[#ef8c8c] bg-[rgba(239,140,140,0.05)] hover:bg-[rgba(239,140,140,0.1)] transition-all flex items-center justify-between cursor-pointer"
                 >
                   <span>Source Outage</span>
-                  <span className="text-[10px]">Truth</span>
+                  <span className="text-[11px] font-semibold">Truth</span>
                 </button>
               </div>
             </div>
-          </div>
-
-          {/* Sidebar Footer Integrity Note */}
-          <div className="pt-4 border-t border-[rgba(236,233,223,0.08)] text-[11px] font-mono text-[#69756d]">
-            <div className="flex items-center gap-1.5 text-[#d8f57b] mb-1">
-              <Shield className="w-3.5 h-3.5" />
-              <span className="font-semibold">Cairnwise Core v2.0</span>
-            </div>
-            <span>No automated public accusation or unsupervised takedown.</span>
           </div>
         </aside>
 
@@ -1214,193 +1418,471 @@ export default function WorkspaceDashboard() {
               TAB 1: OVERVIEW & OPERATING LOOP
               ======================================================== */}
           {activeTab === 'overview' && (
-            <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
-              {/* Header Title */}
-              <div>
-                <h1 style={{ fontFamily: 'var(--font-serif)' }} className="text-3xl font-normal text-[#f2efe7] tracking-tight mb-2">
-                  Operating Loop &amp; Forensic Ledger
-                </h1>
-                <p className="text-sm text-[#9ba69e] max-w-3xl leading-relaxed">
-                  Cairnwise executes an accountable digital risk loop: verified brand baseline, permitted observations, 4-dimensional signal triangulation, and human decision governance.
-                </p>
-              </div>
-
-              {/* 4 Metric Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="glass-panel p-5 rounded-xl border border-[rgba(236,233,223,0.08)] hover:border-[rgba(216,245,123,0.3)] transition-all">
-                  <div className="text-[10px] font-mono text-[#69756d] uppercase tracking-wider mb-2">OPEN TRIAGE QUEUE</div>
-                  <div className="text-3xl font-serif text-[#e9ad71] mb-1">{String(metrics.openReviewCount).padStart(2, '0')}</div>
-                  <div className="text-xs text-[#9ba69e]">Awaiting human operator signoff</div>
+            <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
+              {/* Header Title with Right-aligned Evaluation Mode */}
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div>
+                  <div className="text-[10px] font-mono tracking-widest text-[#738276] uppercase mb-1.5">
+                    DIGITAL IDENTITY RISK OPERATIONS
+                  </div>
+                  <h1 style={{ fontFamily: 'var(--font-serif)' }} className="text-3xl lg:text-[34px] font-normal text-[#f2efe7] tracking-tight mb-2">
+                    Operating Loop &amp; Forensic Ledger
+                  </h1>
+                  <p className="text-xs lg:text-sm text-[#9ba69e] max-w-2xl leading-relaxed">
+                    Evidence-first monitoring and triage for brand impersonation across social media and app stores.
+                  </p>
                 </div>
 
-                <div className="glass-panel p-5 rounded-xl border border-[rgba(236,233,223,0.08)] hover:border-[rgba(216,245,123,0.3)] transition-all">
-                  <div className="text-[10px] font-mono text-[#69756d] uppercase tracking-wider mb-2">EVIDENCE RECORDS</div>
-                  <div className="text-3xl font-serif text-[#d8f57b] mb-1">{String(metrics.totalEvidenceCount).padStart(2, '0')}</div>
-                  <div className="text-xs text-[#9ba69e]">SHA-256 integrity chained</div>
-                </div>
-
-                <div className="glass-panel p-5 rounded-xl border border-[rgba(236,233,223,0.08)] hover:border-[rgba(216,245,123,0.3)] transition-all">
-                  <div className="text-[10px] font-mono text-[#69756d] uppercase tracking-wider mb-2">REGISTERED ASSETS</div>
-                  <div className="text-3xl font-serif text-[#ece9df] mb-1">{String(metrics.authorizedCount).padStart(2, '0')}</div>
-                  <div className="text-xs text-[#9ba69e]">Official verified identifiers</div>
-                </div>
-
-                <div className="glass-panel p-5 rounded-xl border border-[rgba(236,233,223,0.08)] hover:border-[rgba(216,245,123,0.3)] transition-all">
-                  <div className="text-[10px] font-mono text-[#69756d] uppercase tracking-wider mb-2">FIREWALL EXCLUSIONS</div>
-                  <div className="text-3xl font-serif text-[#9cc4d9] mb-1">{String(metrics.firewallExclusions).padStart(2, '0')}</div>
-                  <div className="text-xs text-[#9ba69e]">Zero false accusation guarantee</div>
+                {/* Evaluation Mode Box */}
+                <div className="rounded-xl border border-[rgba(236,233,223,0.08)] bg-[rgba(14,20,17,0.7)] p-3.5 max-w-sm flex items-start gap-3 backdrop-blur-sm self-start flex-shrink-0">
+                  <div className="w-5 h-5 rounded-full border border-[rgba(236,233,223,0.2)] flex items-center justify-center flex-shrink-0 mt-0.5 text-[#9ba69e] text-xs font-serif italic">
+                    i
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-[#f2efe7]">Evaluation mode</div>
+                    <div className="text-xs text-[#9ba69e] mt-0.5 leading-relaxed">
+                      Running with fixture data and manual observations. No live monitoring claims.{' '}
+                      <button 
+                        onClick={() => setActiveTab('coverage')} 
+                        className="text-[#d8f57b] hover:underline font-medium inline-flex items-center gap-0.5 ml-1 cursor-pointer"
+                      >
+                        <span>See coverage contract</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Operating Loop Flow Diagram */}
+              {/* 4 Metric Stat Cards (2x2 Grid Matching Target) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 01: Open triage */}
+                <div 
+                  onClick={() => { setActiveTab('queue'); playTacticalSound('action'); }}
+                  className="glass-panel p-5 rounded-xl border border-[rgba(236,233,223,0.08)] hover:border-[rgba(233,173,113,0.4)] transition-all cursor-pointer group flex items-start justify-between"
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-[rgba(233,173,113,0.12)] border border-[rgba(233,173,113,0.25)] flex items-center justify-center text-[#e9ad71] flex-shrink-0">
+                      <SlidersHorizontal className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-serif font-bold text-[#e9ad71] leading-none mb-1.5">
+                        {String(metrics.openReviewCount).padStart(2, '0')}
+                      </div>
+                      <div className="text-sm font-semibold text-[#f2efe7] group-hover:text-[#e9ad71] transition-colors">
+                        Open triage
+                      </div>
+                      <div className="text-xs text-[#9ba69e] mt-0.5">
+                        Awaiting analyst review
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[#69756d] group-hover:text-[#e9ad71] group-hover:translate-x-0.5 transition-all mt-1" />
+                </div>
+
+                {/* 02: Evidence records */}
+                <div 
+                  onClick={() => { setActiveTab('audit'); playTacticalSound('action'); }}
+                  className="glass-panel p-5 rounded-xl border border-[rgba(236,233,223,0.08)] hover:border-[rgba(216,245,123,0.4)] transition-all cursor-pointer group flex items-start justify-between"
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-[rgba(216,245,123,0.1)] border border-[rgba(216,245,123,0.25)] flex items-center justify-center text-[#d8f57b] flex-shrink-0">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-serif font-bold text-[#f2efe7] leading-none mb-1.5">
+                        {String(metrics.totalEvidenceCount).padStart(2, '0')}
+                      </div>
+                      <div className="text-sm font-semibold text-[#f2efe7] group-hover:text-[#d8f57b] transition-colors">
+                        Evidence records
+                      </div>
+                      <div className="text-xs text-[#9ba69e] mt-0.5">
+                        Integrity-linked
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[#69756d] group-hover:text-[#d8f57b] group-hover:translate-x-0.5 transition-all mt-1" />
+                </div>
+
+                {/* 03: Registered assets */}
+                <div 
+                  onClick={() => { setActiveTab('registry'); playTacticalSound('action'); }}
+                  className="glass-panel p-5 rounded-xl border border-[rgba(236,233,223,0.08)] hover:border-[rgba(156,196,217,0.4)] transition-all cursor-pointer group flex items-start justify-between"
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-[rgba(156,196,217,0.12)] border border-[rgba(156,196,217,0.25)] flex items-center justify-center text-[#9cc4d9] flex-shrink-0">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-serif font-bold text-[#f2efe7] leading-none mb-1.5">
+                        {String(metrics.authorizedCount).padStart(2, '0')}
+                      </div>
+                      <div className="text-sm font-semibold text-[#f2efe7] group-hover:text-[#9cc4d9] transition-colors">
+                        Registered assets
+                      </div>
+                      <div className="text-xs text-[#9ba69e] mt-0.5">
+                        Official verified identifiers
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[#69756d] group-hover:text-[#9cc4d9] group-hover:translate-x-0.5 transition-all mt-1" />
+                </div>
+
+                {/* 04: Official exclusions */}
+                <div 
+                  onClick={() => {
+                    setActiveTab('registry');
+                    triggerToast('Filtering for official firewall exclusions');
+                    playTacticalSound('action');
+                  }}
+                  className="glass-panel p-5 rounded-xl border border-[rgba(236,233,223,0.08)] hover:border-[rgba(110,231,183,0.4)] transition-all cursor-pointer group flex items-start justify-between"
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-10 h-10 rounded-lg bg-[rgba(110,231,183,0.12)] border border-[rgba(110,231,183,0.25)] flex items-center justify-center text-[#6ee7b7] flex-shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-serif font-bold text-[#f2efe7] leading-none mb-1.5">
+                        {String(metrics.firewallExclusions).padStart(2, '0')}
+                      </div>
+                      <div className="text-sm font-semibold text-[#f2efe7] group-hover:text-[#6ee7b7] transition-colors">
+                        Official exclusions
+                      </div>
+                      <div className="text-xs text-[#9ba69e] mt-0.5">
+                        Verified identifier match
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-[#69756d] group-hover:text-[#6ee7b7] group-hover:translate-x-0.5 transition-all mt-1" />
+                </div>
+              </div>
+
+              {/* Forensic Workflow Horizontal Pipeline */}
               <div className="glass-panel p-6 rounded-xl border border-[rgba(236,233,223,0.08)]">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-[#ece9df] tracking-wide uppercase font-mono">
-                    VERIFIABLE 7-PHASE FORENSIC PIPELINE
-                  </h3>
-                  <span className="text-[11px] font-mono text-[#d8f57b]">ACTIVE WORKFLOW</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+                  <div>
+                    <h3 style={{ fontFamily: 'var(--font-serif)' }} className="text-lg font-normal text-[#f2efe7]">
+                      Forensic workflow
+                    </h3>
+                    <p className="text-xs text-[#9ba69e] mt-0.5">
+                      From brand baseline to evidence-linked decisions. Each step is auditable and reproducible.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowWorkflowDetailsModal(true);
+                      playTacticalSound('action');
+                    }}
+                    className="text-xs font-mono font-medium text-[#d8f57b] hover:underline inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                  >
+                    <span>View workflow details</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center text-xs font-mono">
-                  <div className="p-3 rounded bg-[rgba(14,20,17,0.7)] border border-[rgba(216,245,123,0.2)]">
-                    <span className="text-[10px] text-[#69756d] block mb-1">01</span>
-                    <span className="text-[#ece9df] font-medium">Brand Baseline</span>
-                  </div>
-                  <div className="p-3 rounded bg-[rgba(14,20,17,0.7)] border border-[rgba(216,245,123,0.2)]">
-                    <span className="text-[10px] text-[#69756d] block mb-1">02</span>
-                    <span className="text-[#ece9df] font-medium">Permitted Probe</span>
-                  </div>
-                  <div className="p-3 rounded bg-[rgba(14,20,17,0.7)] border border-[rgba(216,245,123,0.2)]">
-                    <span className="text-[10px] text-[#69756d] block mb-1">03</span>
-                    <span className="text-[#ece9df] font-medium">4D Triangulate</span>
-                  </div>
-                  <div className="p-3 rounded bg-[rgba(14,20,17,0.7)] border border-[rgba(216,245,123,0.2)]">
-                    <span className="text-[10px] text-[#69756d] block mb-1">04</span>
-                    <span className="text-[#ece9df] font-medium">Firewall Exclude</span>
-                  </div>
-                  <div className="p-3 rounded bg-[rgba(14,20,17,0.7)] border border-[rgba(216,245,123,0.2)]">
-                    <span className="text-[10px] text-[#69756d] block mb-1">05</span>
-                    <span className="text-[#e9ad71] font-medium">Human Triage</span>
-                  </div>
-                  <div className="p-3 rounded bg-[rgba(14,20,17,0.7)] border border-[rgba(216,245,123,0.2)]">
-                    <span className="text-[10px] text-[#69756d] block mb-1">06</span>
-                    <span className="text-[#ece9df] font-medium">Proof Ledger</span>
-                  </div>
-                  <div className="p-3 rounded bg-[rgba(14,20,17,0.7)] border border-[rgba(216,245,123,0.2)]">
-                    <span className="text-[10px] text-[#69756d] block mb-1">07</span>
-                    <span className="text-[#d8f57b] font-medium">Recheck Loop</span>
+
+                {/* 7-Step Connected Timeline */}
+                <div className="relative mt-8 mb-2">
+                  {/* Connecting Line behind circles */}
+                  <div className="hidden sm:block absolute top-[16px] left-[6%] right-[6%] h-[1px] bg-[rgba(236,233,223,0.18)] z-0" />
+
+                  <div className="flex items-start justify-between relative z-10 w-full">
+                    {[
+                      { step: '01', title: 'Brand baseline', sub: 'Verified assets', active: true },
+                      { step: '02', title: 'Permitted observation', sub: 'Collect from sources', active: false },
+                      { step: '03', title: 'Signal triangulation', sub: 'Multi-dimensional', active: false },
+                      { step: '04', title: 'Official-asset firewall', sub: 'Exclude verified', active: false },
+                      { step: '05', title: 'Human triage', sub: 'Analyst review', active: false },
+                      { step: '06', title: 'Proof ledger', sub: 'Evidence & actions', active: false },
+                      { step: '07', title: 'Recheck', sub: 'Monitor outcome', active: false },
+                    ].map((item, idx) => (
+                      <button
+                        key={item.step}
+                        onClick={() => {
+                          setSelectedWorkflowStep(idx + 1);
+                          setShowWorkflowDetailsModal(true);
+                          playTacticalSound('action');
+                        }}
+                        className="flex-1 flex flex-col items-center text-center group cursor-pointer focus:outline-none px-1"
+                      >
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-mono font-semibold transition-all mb-2 ${
+                          item.active
+                            ? 'bg-[#84cc16] text-[#0d140e] shadow-[0_0_12px_rgba(132,204,22,0.5)] ring-4 ring-[rgba(132,204,22,0.15)]'
+                            : 'bg-[#0d140e] border border-[rgba(236,233,223,0.25)] text-[#9ba69e] group-hover:border-[#d8f57b] group-hover:text-[#ece9df]'
+                        }`}>
+                          {item.step}
+                        </div>
+                        <div className="text-xs font-medium text-[#ece9df] group-hover:text-[#d8f57b] transition-colors leading-tight">
+                          {item.title}
+                        </div>
+                        <div className="text-[10px] text-[#69756d] mt-1 leading-tight">
+                          {item.sub}
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
 
-              {/* 2-Column Split: Baseline Card & Intake Launcher */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Card: Verified Brand Record */}
+              {/* 2-Column Split: Active Brand Profile & Source Coverage */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left: Active Brand Profile Card */}
                 <div className="glass-panel p-6 rounded-xl border border-[rgba(236,233,223,0.08)] flex flex-col justify-between">
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-[rgba(216,245,123,0.1)] border border-[rgba(216,245,123,0.2)] flex items-center justify-center text-[#d8f57b]">
-                          <Shield className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-medium text-[#ece9df]">Active Brand Profile</h3>
-                          <span className="text-xs text-[#9ba69e] font-mono">{brand.canonical_name}</span>
-                        </div>
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className="w-12 h-12 rounded-xl bg-[rgba(34,197,94,0.12)] border border-[rgba(34,197,94,0.25)] flex items-center justify-center text-[#4ade80] flex-shrink-0">
+                        <Shield className="w-6 h-6" />
                       </div>
-                      <span className="px-2.5 py-1 rounded-full text-[10.5px] font-mono bg-[rgba(216,245,123,0.08)] border border-[rgba(216,245,123,0.25)] text-[#d8f57b]">
-                        BASELINE VERIFIED
-                      </span>
+                      <div>
+                        <div className="text-xs font-mono text-[#9ba69e] uppercase tracking-wider">
+                          Active brand profile
+                        </div>
+                        <div className="flex items-center gap-2.5 mt-0.5">
+                          <h3 style={{ fontFamily: 'var(--font-serif)' }} className="text-2xl font-bold text-[#f2efe7]">
+                            {brand.name}
+                          </h3>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[rgba(216,245,123,0.06)] border border-[rgba(216,245,123,0.25)] text-[#d8f57b] font-semibold">
+                            BASELINE VERIFIED
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#9ba69e] mt-1">
+                          Official brand configuration and protected identifiers.
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="space-y-3 my-4 text-xs font-mono">
-                      <div className="flex justify-between py-1.5 border-b border-[rgba(236,233,223,0.06)]">
-                        <span className="text-[#69756d]">OFFICIAL WEBSITE:</span>
-                        <a href={brand.website} target="_blank" rel="noreferrer" className="text-[#d8f57b] hover:underline flex items-center gap-1">
-                          {brand.website} <ExternalLink className="w-3 h-3" />
+                    {/* 3 Info Rows */}
+                    <div className="space-y-3.5 my-5 text-xs font-mono border-t border-[rgba(236,233,223,0.06)] pt-4">
+                      <div className="flex items-center justify-between py-1">
+                        <div className="flex items-center gap-2.5 text-[#9ba69e]">
+                          <Globe className="w-4 h-4 text-[#69756d]" />
+                          <span>Official website</span>
+                        </div>
+                        <a 
+                          href={brand.website} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="text-[#ece9df] hover:text-[#d8f57b] hover:underline flex items-center gap-1 font-mono text-xs"
+                        >
+                          <span>{brand.website}</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-[#9ba69e]" />
                         </a>
                       </div>
-                      <div className="flex justify-between py-1.5 border-b border-[rgba(236,233,223,0.06)]">
-                        <span className="text-[#69756d]">REGISTRATION LOCALE:</span>
-                        <span className="text-[#ece9df]">{brand.locale} (India, Singapore, EU)</span>
+
+                      <div className="flex items-center justify-between py-1">
+                        <div className="flex items-center gap-2.5 text-[#9ba69e]">
+                          <Globe className="w-4 h-4 text-[#69756d]" />
+                          <span>Registration locale</span>
+                        </div>
+                        <span className="text-[#ece9df]">
+                          {brand.locale} · India, Singapore, EU
+                        </span>
                       </div>
-                      <div className="flex justify-between py-1.5 border-b border-[rgba(236,233,223,0.06)]">
-                        <span className="text-[#69756d]">PROTECTED ASSETS:</span>
-                        <span className="text-[#ece9df]">{assets.length} Assets Registered</span>
+
+                      <div className="flex items-center justify-between py-1">
+                        <div className="flex items-center gap-2.5 text-[#9ba69e]">
+                          <Layers className="w-4 h-4 text-[#69756d]" />
+                          <span>Protected assets</span>
+                        </div>
+                        <span className="text-[#ece9df]">
+                          {assets.length} assets registered
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-[rgba(236,233,223,0.08)] flex items-center justify-between">
-                    <span className="text-xs text-[#9ba69e]">Need to register new official handle or APK?</span>
+                  <div className="pt-2 flex justify-end">
                     <button
-                      onClick={() => setActiveTab('registry')}
-                      className="px-3 py-1.5 rounded text-xs font-mono text-[#d8f57b] hover:bg-[rgba(216,245,123,0.08)] transition-colors flex items-center gap-1.5"
+                      onClick={() => { setActiveTab('registry'); playTacticalSound('action'); }}
+                      className="text-xs font-mono font-medium text-[#d8f57b] hover:underline inline-flex items-center gap-1.5 cursor-pointer"
                     >
-                      <span>Manage Registry</span>
+                      <span>Manage registry</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
-                {/* Right Card: Candidate Observation Launcher */}
+                {/* Right: Source Coverage Card */}
                 <div className="glass-panel p-6 rounded-xl border border-[rgba(236,233,223,0.08)] flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-base font-medium text-[#ece9df]">Run Forensic Intake</h3>
-                        <p className="text-xs text-[#9ba69e] mt-0.5">Submit an observation for deterministic assessment against baseline.</p>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-sm font-semibold text-[#f2efe7]">
+                          Source coverage
+                        </h3>
+                        <span className="text-xs text-[#9ba69e] font-normal">
+                          (evaluation)
+                        </span>
                       </div>
-                      <span className="px-2.5 py-1 rounded text-[10.5px] font-mono bg-[rgba(14,20,17,0.7)] text-[#c5d3bd] border border-[rgba(236,233,223,0.12)]">
-                        READY
-                      </span>
+                      <button
+                        onClick={() => { setActiveTab('coverage'); playTacticalSound('action'); }}
+                        className="text-xs font-mono font-medium text-[#d8f57b] hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>View contract</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
-                    <div className="space-y-2.5 my-4">
-                      <button
-                        onClick={() => handleRunFixture('social.lookalike')}
-                        className="w-full text-left p-3 rounded-lg bg-[rgba(14,20,17,0.6)] hover:bg-[rgba(216,245,123,0.08)] border border-[rgba(236,233,223,0.06)] hover:border-[rgba(216,245,123,0.3)] transition-all flex items-center justify-between group"
-                      >
-                        <div>
-                          <div className="text-xs font-semibold text-[#f2efe7] group-hover:text-[#d8f57b]">Social Profile Look-alike Test</div>
-                          <div className="text-[11px] text-[#9ba69e] font-mono">@northstar_pay_support &bull; Cyrillic &amp; Phishing Bio</div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-[#69756d] group-hover:text-[#d8f57b] group-hover:translate-x-0.5 transition-all" />
-                      </button>
+                    {/* 7 Source rows */}
+                    <div className="divide-y divide-[rgba(236,233,223,0.04)] text-xs font-mono">
+                      {[
+                        { name: 'X (Twitter)', icon: 'x', status: 'Fixture data', statusType: 'amber', action: 'Test access', actionType: 'test' },
+                        { name: 'Instagram', icon: 'instagram', status: 'Fixture data', statusType: 'amber', action: 'Test access', actionType: 'test' },
+                        { name: 'YouTube', icon: 'youtube', status: 'Fixture data', statusType: 'amber', action: 'Test access', actionType: 'test' },
+                        { name: 'TikTok', icon: 'tiktok', status: 'Not configured', statusType: 'gray', action: 'Connect', actionType: 'connect' },
+                        { name: 'Google Play', icon: 'google_play', status: 'Fixture data', statusType: 'amber', action: 'Test access', actionType: 'test' },
+                        { name: 'Apple App Store', icon: 'apple', status: 'Fixture data', statusType: 'amber', action: 'Test access', actionType: 'test' },
+                        { name: 'Bluesky', icon: 'bluesky', status: 'Disabled', statusType: 'rose', action: 'Configure', actionType: 'configure' },
+                      ].map((src) => (
+                        <div key={src.name} className="py-2.5 flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-[#9ba69e] w-4 flex justify-center">
+                              {renderPlatformIcon(src.icon)}
+                            </span>
+                            <span className="text-[#ece9df] font-medium">{src.name}</span>
+                          </div>
 
-                      <button
-                        onClick={() => handleRunFixture('app.lookalike')}
-                        className="w-full text-left p-3 rounded-lg bg-[rgba(14,20,17,0.6)] hover:bg-[rgba(216,245,123,0.08)] border border-[rgba(236,233,223,0.06)] hover:border-[rgba(216,245,123,0.3)] transition-all flex items-center justify-between group"
-                      >
-                        <div>
-                          <div className="text-xs font-semibold text-[#f2efe7] group-hover:text-[#d8f57b]">Counterfeit APK Publisher Mismatch</div>
-                          <div className="text-[11px] text-[#9ba69e] font-mono">pay-northstar-direct.apk &bull; Publisher: Apex Digital Labs</div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-[#69756d] group-hover:text-[#d8f57b] group-hover:translate-x-0.5 transition-all" />
-                      </button>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                src.statusType === 'amber'
+                                  ? 'bg-[#f59e0b]'
+                                  : src.statusType === 'rose'
+                                  ? 'bg-[#ef4444]'
+                                  : 'bg-[#f59e0b]'
+                              }`} />
+                              <span className="text-[11px] text-[#9ba69e]">{src.status}</span>
+                            </div>
 
-                      <button
-                        onClick={() => handleRunFixture('social.official')}
-                        className="w-full text-left p-3 rounded-lg bg-[rgba(14,20,17,0.6)] hover:bg-[rgba(216,245,123,0.08)] border border-[rgba(236,233,223,0.06)] hover:border-[rgba(216,245,123,0.3)] transition-all flex items-center justify-between group"
-                      >
-                        <div>
-                          <div className="text-xs font-semibold text-[#f2efe7] group-hover:text-[#d8f57b]">Official Control Asset Verification</div>
-                          <div className="text-[11px] text-[#9ba69e] font-mono">did:plc:northstarofficial2026 &bull; Automatic Exclusion Test</div>
+                            <button
+                              onClick={() => handleSourceAction(src.name, src.actionType)}
+                              className={`text-[11px] transition-colors cursor-pointer ${
+                                src.actionType === 'connect'
+                                  ? 'text-[#d8f57b] hover:underline font-semibold'
+                                  : 'text-[#9ba69e] hover:text-[#d8f57b]'
+                              }`}
+                            >
+                              {src.action}
+                            </button>
+                          </div>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-[#69756d] group-hover:text-[#d8f57b] group-hover:translate-x-0.5 transition-all" />
-                      </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Card: Forensic Intake Table */}
+              <div className="glass-panel p-6 rounded-xl border border-[rgba(236,233,223,0.08)]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-[rgba(236,233,223,0.05)] border border-[rgba(236,233,223,0.1)] flex items-center justify-center text-[#d8f57b] flex-shrink-0 mt-0.5">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 style={{ fontFamily: 'var(--font-serif)' }} className="text-base font-normal text-[#f2efe7]">
+                        Forensic intake
+                      </h3>
+                      <p className="text-xs text-[#9ba69e] mt-0.5">
+                        Assess a submitted observation against the verified brand baseline.
+                      </p>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-[rgba(236,233,223,0.08)] flex items-center justify-between">
-                    <span className="text-xs text-[#9ba69e]">Test live character swap / Unicode homoglyph?</span>
+                  <div className="flex items-center gap-3">
                     <button
-                      onClick={() => setActiveTab('simulator')}
-                      className="px-3 py-1.5 rounded text-xs font-mono text-[#d8f57b] hover:bg-[rgba(216,245,123,0.08)] transition-colors flex items-center gap-1.5"
+                      onClick={() => {
+                        setShowNewIntakeModal(true);
+                        playTacticalSound('action');
+                      }}
+                      className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-[#84cc16] hover:bg-[#97e01b] text-[#0d140e] transition-all flex items-center gap-1.5 shadow-[0_2px_12px_rgba(132,204,22,0.3)] cursor-pointer"
                     >
-                      <span>Open Simulator</span>
+                      <span>Submit new</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setActiveTab('queue'); playTacticalSound('action'); }}
+                      className="text-xs text-[#9ba69e] hover:text-[#ece9df] inline-flex items-center gap-1 cursor-pointer font-medium"
+                    >
+                      <span>View all</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                </div>
+
+                {/* Intake Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-[rgba(236,233,223,0.08)] text-[10px] text-[#69756d] uppercase tracking-wider">
+                        <th className="py-2.5 px-3">ID</th>
+                        <th className="py-2.5 px-3">TYPE</th>
+                        <th className="py-2.5 px-3">TITLE / DETAILS</th>
+                        <th className="py-2.5 px-3">SOURCE</th>
+                        <th className="py-2.5 px-3">RISK</th>
+                        <th className="py-2.5 px-3">STATUS</th>
+                        <th className="py-2.5 px-3">UPDATED</th>
+                        <th className="py-2.5 px-3 text-right"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[rgba(236,233,223,0.04)]">
+                      {intakeRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => {
+                            setSelectedCandidate(row.candidate);
+                            setActiveTab('queue');
+                            playTacticalSound('action');
+                          }}
+                          className="hover:bg-[rgba(236,233,223,0.03)] cursor-pointer group transition-colors"
+                        >
+                          <td className="py-3 px-3 font-mono text-[#ece9df]">
+                            {row.ref}
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2 text-[#9ba69e]">
+                              <span>{renderPlatformIcon(row.icon)}</span>
+                              <span>{row.typeLabel}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 max-w-md">
+                            <div className="font-sans font-medium text-[#f2efe7] group-hover:text-[#d8f57b] transition-colors">
+                              {row.title}
+                            </div>
+                            <div className="text-[11px] text-[#738276] truncate mt-0.5">
+                              {row.details}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-[#9ba69e]">
+                            <div className="flex items-center gap-1.5">
+                              <span>{renderPlatformIcon(row.icon)}</span>
+                              <span>{row.sourceName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 font-semibold">
+                            <span className={row.risk >= 0.9 ? 'text-[#ef4444]' : row.risk >= 0.75 ? 'text-[#e9ad71]' : 'text-[#84cc16]'}>
+                              {row.risk.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium ${
+                              row.status === 'High'
+                                ? 'bg-[rgba(239,68,68,0.12)] border border-[rgba(239,68,68,0.25)] text-[#ef4444]'
+                                : 'bg-[rgba(233,173,113,0.12)] border border-[rgba(233,173,113,0.25)] text-[#e9ad71]'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${row.status === 'High' ? 'bg-[#ef4444]' : 'bg-[#e9ad71]'}`} />
+                              <span>{row.status}</span>
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-[#738276]">
+                            {row.updated}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <ChevronRight className="w-4 h-4 text-[#69756d] group-hover:text-[#d8f57b] group-hover:translate-x-0.5 transition-all inline" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -2383,6 +2865,74 @@ export default function WorkspaceDashboard() {
             triggerToast(`Dispatched ${platform.toUpperCase()} notice. Cryptographic record added.`);
             playTacticalSound('success');
           }}
+        />
+      )}
+
+      {/* ========================================================
+          MODAL: WORKSPACE SWITCHER
+          ======================================================== */}
+      <WorkspaceSwitcherModal
+        isOpen={showWorkspaceModal}
+        onClose={() => setShowWorkspaceModal(false)}
+        currentBrand={brand}
+        onSelectWorkspace={(ws) => {
+          setBrand(ws);
+          triggerToast(`Switched active workspace to ${ws.name} (${ws.locale})`);
+          playTacticalSound('action');
+        }}
+      />
+
+      {/* ========================================================
+          MODAL: TRUTH BOUNDARY AUDIT CONTRACT
+          ======================================================== */}
+      <TruthBoundaryModal
+        isOpen={showTruthModal}
+        onClose={() => setShowTruthModal(false)}
+      />
+
+      {/* ========================================================
+          MODAL: ANALYST PROFILE CREDENTIALS
+          ======================================================== */}
+      <AnalystProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        email={user?.email || 'elena.vance@northstar.security'}
+        onSignOut={() => {
+          signOut();
+          router.push('/login');
+        }}
+      />
+
+      {/* ========================================================
+          MODAL: 7-PHASE FORENSIC WORKFLOW DETAILS
+          ======================================================== */}
+      <ForensicWorkflowModal
+        isOpen={showWorkflowDetailsModal}
+        onClose={() => setShowWorkflowDetailsModal(false)}
+        initialStep={selectedWorkflowStep}
+      />
+
+      {/* ========================================================
+          MODAL: SUBMIT NEW FORENSIC INTAKE
+          ======================================================== */}
+      <SubmitNewIntakeModal
+        isOpen={showNewIntakeModal}
+        onClose={() => setShowNewIntakeModal(false)}
+        brandName={brand.name}
+        brandLocale={brand.locale}
+        onIngestCandidate={handleIngestNewCandidate}
+      />
+
+      {/* ========================================================
+          MODAL: SOURCE CONNECTOR DIAGNOSTIC
+          ======================================================== */}
+      {selectedSourceForTest && (
+        <SourceDiagnosticModal
+          isOpen={showSourceTestModal}
+          onClose={() => setShowSourceTestModal(false)}
+          sourceName={selectedSourceForTest.name}
+          sourceType={selectedSourceForTest.type}
+          initialMode={selectedSourceForTest.status}
         />
       )}
 
