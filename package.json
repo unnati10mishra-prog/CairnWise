@@ -2,10 +2,18 @@
   "name": "cairnwise",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "web"
+  ],
   "scripts": {
     "dev": "npm --prefix web run dev",
     "build": "npm --prefix web run build",
     "start": "npm --prefix web run start",
     "lint": "npm --prefix web run lint"
+  },
+  "dependencies": {
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   }
 }
